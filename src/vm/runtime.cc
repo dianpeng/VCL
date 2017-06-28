@@ -102,7 +102,7 @@ MethodStatus Runtime::Main( Value* output , int64_t instr_count ) {
     procedure->code_buffer().BeginAt(CurrentFrame()->pc);
 
   // Jump table for threading interpretation
-  static const void* kLabels[] = {
+  static void* kLabels[] = {
 #define __(A,B,C) &&LABEL_##A,
     VCL_BYTECODE_LIST(__)
     NULL
