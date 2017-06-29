@@ -159,7 +159,7 @@ TEST(Parser,Expression) {
       );
 
   positive( vcl 4.0;
-      global a = 1 + 2 * a - [] + "string" / foo();
+      global a = 1 + 2 * a - [] / foo();
       global b = a % 10 ;
       global c = if(a,b,c) + if(b,c,d);
       global e = 1 + 2 * 100 * (a + b + c);
@@ -315,7 +315,7 @@ TEST(Parser,Statement) {
               if(d)
                 if(e)
                   if(f)
-                    set ss.xx.ff.uu += true + "string";
+                    set ss.xx.ff.uu += true + false;
        }
      );
   positive( vcl 4.0;
@@ -411,6 +411,10 @@ TEST(Parser,ForUnsport) {
   no_for( vcl 4.0;
           sub foo { continue; }
         );
+}
+
+TEST(Parser,ConstantFold) {
+  positive( vcl 4.0; global a = 1 + 2 + g;);
 }
 
 } // namespace vm

@@ -1,5 +1,7 @@
 #include "parser.h"
 #include "vcl-pri.h"
+
+#include "constant-fold.h"
 #include <vcl/util.h>
 
 namespace vcl {
@@ -763,7 +765,7 @@ ast::AST* Parser::ParseTernary() {
 }
 
 ast::AST* Parser::ParseExpression() {
-  return ParseBinary();
+  return ConstantFold(ParseBinary(),m_zone,m_error);
 }
 
 const int kPrecedence[] = {

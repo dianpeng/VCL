@@ -32,19 +32,18 @@ struct FoldResult {
   {}
 };
 
-class ConstantFold {
+class ConstantFolder {
  public:
-  ConstantFold():
+  ConstantFolder():
     m_zone(NULL),
     m_error(NULL)
   {}
 
-  ast::AST* FoldBinary( ast::Binary* , zone::Zone* , std::string* );
-  ast::AST* FoldTernary(ast::Ternary* , zone::Zone* , std::string* );
+  ast::AST* Fold( ast::AST* , zone::Zone* , std::string* );
 
  private:
   void ReportError( const char* format , ... );
-  // Conversion function that is compatible with our runtime's type conversion
+
   int64_t ToInteger( const FoldResult& value );
   double ToReal   ( const FoldResult& value );
   zone::ZoneString* ToString ( const FoldResult& value );
@@ -63,13 +62,13 @@ class ConstantFold {
   std::string* m_error;
 };
 
-void ConstantFold::ReportError( const char* format , ... ) {
+void ConstantFolder::ReportError( const char* format , ... ) {
   va_list vl;
   va_start(vl,format);
   vcl::util::FormatV(m_error,format,vl);
 }
 
-ast::AST* ConstantFold::GenNode( const FoldResult& value ) {
+ast::AST* ConstantFolder::GenNode( const FoldResult& value ) {
   switch(value.kind) {
     case EKIND_NULL: return new (m_zone) ast::Null(value.location);
     case EKIND_INTEGER:
@@ -86,7 +85,7 @@ ast::AST* ConstantFold::GenNode( const FoldResult& value ) {
   }
 }
 
-int64_t ConstantFold::ToInteger( const FoldResult& value ) {
+int64_t ConstantFolder::ToInteger( const FoldResult& value ) {
   if(value.kind == EKIND_INTEGER ) {
     return boost::get<int64_t>(value.value);
   } else if(value.kind == EKIND_REAL) {
@@ -99,7 +98,7 @@ int64_t ConstantFold::ToInteger( const FoldResult& value ) {
   }
 }
 
-double ConstantFold::ToReal( const FoldResult& value ) {
+double ConstantFolder::ToReal( const FoldResult& value ) {
   if(value.kind == EKIND_REAL) {
     return boost::get<double>(value.value);
   } else if(value.kind == EKIND_INTEGER) {
@@ -112,7 +111,7 @@ double ConstantFold::ToReal( const FoldResult& value ) {
   }
 }
 
-bool ConstantFold::ToBoolean( const FoldResult& value ) {
+bool ConstantFolder::ToBoolean( const FoldResult& value ) {
   switch(value.kind) {
     case EKIND_INTEGER: return boost::get<int64_t>(value.value) != 0;
     case EKIND_REAL: return boost::get<double>(value.value) != 0.0;
@@ -123,7 +122,7 @@ bool ConstantFold::ToBoolean( const FoldResult& value ) {
   }
 }
 
-zone::ZoneString* ConstantFold::ToString( const FoldResult& value ) {
+zone::ZoneString* ConstantFolder::ToString( const FoldResult& value ) {
   if(value.kind == EKIND_STRING) {
     return boost::get<zone::ZoneString*>(value.value);
   } else {
@@ -133,7 +132,7 @@ zone::ZoneString* ConstantFold::ToString( const FoldResult& value ) {
 }
 
 
-ExpressionKind ConstantFold::ArithPromotion( ExpressionKind left ,
+ExpressionKind ConstantFolder::ArithPromotion( ExpressionKind left ,
                                              ExpressionKind right ) {
   switch(left) {
     case EKIND_INTEGER:
@@ -156,7 +155,7 @@ ExpressionKind ConstantFold::ArithPromotion( ExpressionKind left ,
   }
 }
 
-ast::AST* ConstantFold::Fold( ast::AST* node , FoldResult* result ) {
+ast::AST* ConstantFolder::Fold( ast::AST* node , FoldResult* result ) {
   switch(node->type) {
     case ast::AST_BINARY:
       return Fold(static_cast<ast::Binary*>(node),result);
@@ -197,7 +196,7 @@ ast::AST* ConstantFold::Fold( ast::AST* node , FoldResult* result ) {
 }
 
 
-ast::AST* ConstantFold::Fold( ast::Binary* binary , FoldResult* result ) {
+ast::AST* ConstantFolder::Fold( ast::Binary* binary , FoldResult* result ) {
   FoldResult rhs_result;
   ast::AST* lhs = Fold(binary->lhs,result);
   ast::AST* rhs;
@@ -213,7 +212,30 @@ ast::AST* ConstantFold::Fold( ast::Binary* binary , FoldResult* result ) {
     default: break;
   }
 
-  // Now fold the other part
+  switch(binary->op) {
+    case TK_AND: {
+      bool lhs = ToBoolean(*result);
+      if(!lhs) {
+        result->kind = EKIND_BOOLEAN;
+        result->value= false;
+        result->location = binary->location;
+        return NULL;
+      }
+    }
+    break;
+    case TK_OR: {
+      bool lhs = ToBoolean(*result);
+      if(!lhs) {
+        result->kind = EKIND_BOOLEAN;
+        result->value= false;
+        result->location = binary->location;
+        return NULL;
+      }
+    }
+    break;
+    default: break;
+  }
+
   rhs = Fold(binary->rhs,&rhs_result);
 
   switch(rhs_result.kind) {
@@ -223,13 +245,43 @@ ast::AST* ConstantFold::Fold( ast::Binary* binary , FoldResult* result ) {
       DCHECK(rhs);
       binary->lhs = lhs ? lhs : GenNode(*result);
       binary->rhs = rhs;
+      result->kind = EKIND_COMPLEX; // Change type for the caller
       return binary;
+    default: break;
+  }
+
+  switch(binary->op) {
+    case TK_AND: {
+      bool lhs = ToBoolean(*result);
+      if(!lhs) {
+        result->kind = EKIND_BOOLEAN;
+        result->value= false;
+        result->location = binary->location;
+        return NULL;
+      } else {
+        binary->rhs = GenNode(*result);
+        result->kind = EKIND_COMPLEX;
+        return binary;
+      }
+    }
+    case TK_OR: {
+      bool lhs = ToBoolean(*result);
+      if(!lhs) {
+        result->kind = EKIND_BOOLEAN;
+        result->value= false;
+        result->location = binary->location;
+        return NULL;
+      } else {
+        binary->rhs = GenNode(*result);
+        result->kind = EKIND_COMPLEX;
+        return binary;
+      }
+    }
     default: break;
   }
 
   if((result->kind == EKIND_NULL ||  rhs_result.kind == EKIND_NULL) &&
      (binary->op == TK_EQ || binary->op == TK_NE )) {
-    // null related comparison
     result->kind = EKIND_BOOLEAN;
     if(binary->op == TK_EQ) {
       result->value = (result->kind == EKIND_NULL && rhs_result.kind == EKIND_NULL);
@@ -238,7 +290,6 @@ ast::AST* ConstantFold::Fold( ast::Binary* binary , FoldResult* result ) {
     }
   } else if(result->kind == EKIND_INTEGER || result->kind == EKIND_REAL ||
             result->kind == EKIND_BOOLEAN ) {
-    // arithmatic operations
     ExpressionKind type = ArithPromotion(result->kind,rhs_result.kind);
     if(type == EKIND_ERROR) {
       ReportError("type mismatch,cannot perform arithmatic/comparison operation!");
@@ -324,6 +375,13 @@ ast::AST* ConstantFold::Fold( ast::Binary* binary , FoldResult* result ) {
     zone::ZoneString* rval = ToString(rhs_result);
     result->kind = EKIND_BOOLEAN;
     switch(binary->op) {
+      case TK_ADD: {
+        std::string l(lval->data());
+        l.append(rval->data());
+        result->value = zone::ZoneString::New(m_zone,l);
+        result->kind = EKIND_STRING;
+      }
+      break;
       case TK_LT: result->value = (*lval < *rval); break;
       case TK_LE: result->value = (*lval <=*rval); break;
       case TK_GT: result->value = (*lval > *rval); break;
@@ -350,7 +408,7 @@ ast::AST* ConstantFold::Fold( ast::Binary* binary , FoldResult* result ) {
   return NULL;
 }
 
-ast::AST* ConstantFold::Fold( ast::Unary* node , FoldResult* result ) {
+ast::AST* ConstantFolder::Fold( ast::Unary* node , FoldResult* result ) {
   ast::AST* operand = Fold(node->operand,result);
   switch(result->kind) {
     case EKIND_ERROR:
@@ -366,8 +424,7 @@ ast::AST* ConstantFold::Fold( ast::Unary* node , FoldResult* result ) {
   bool flip = false;
 
   switch(result->kind) {
-    case EKIND_BOOLEAN:
-    case EKIND_INTEGER: {
+    case EKIND_BOOLEAN: case EKIND_INTEGER: {
       int64_t v;
       if(result->kind == EKIND_INTEGER)
         v = boost::get<int64_t>(result->value);
@@ -408,7 +465,7 @@ ast::AST* ConstantFold::Fold( ast::Unary* node , FoldResult* result ) {
         result->kind = EKIND_BOOLEAN;
         result->value= static_cast<bool>(v);
       } else {
-        result->kind = EKIND_INTEGER;
+        result->kind = EKIND_REAL;
         result->value= v;
       }
     }
@@ -448,7 +505,7 @@ ast::AST* ConstantFold::Fold( ast::Unary* node , FoldResult* result ) {
   return NULL;
 }
 
-ast::AST* ConstantFold::Fold( ast::StringConcat* node , FoldResult* result ) {
+ast::AST* ConstantFolder::Fold( ast::StringConcat* node , FoldResult* result ) {
   std::string buffer;
   buffer.reserve(128);
   for( size_t i = 0 ; i < node->list.size(); ++i ) {
@@ -460,7 +517,7 @@ ast::AST* ConstantFold::Fold( ast::StringConcat* node , FoldResult* result ) {
   return NULL;
 }
 
-ast::AST* ConstantFold::Fold( ast::Ternary* node , FoldResult* result ) {
+ast::AST* ConstantFolder::Fold( ast::Ternary* node , FoldResult* result ) {
   ast::AST* cond = Fold(node->condition,result);
   switch(result->kind) {
     case EKIND_ERROR: return NULL;
@@ -493,8 +550,8 @@ ast::AST* ConstantFold::Fold( ast::Ternary* node , FoldResult* result ) {
   }
 }
 
-ast::AST* ConstantFold::FoldBinary( ast::Binary* node , zone::Zone* zone ,
-                                                        std::string* error ) {
+ast::AST* ConstantFolder::Fold( ast::AST* node , zone::Zone* zone ,
+                                                 std::string* error ) {
   m_zone = zone;
   m_error= error;
   FoldResult result;
@@ -507,27 +564,7 @@ ast::AST* ConstantFold::FoldBinary( ast::Binary* node , zone::Zone* zone ,
     case EKIND_STRING:
     case EKIND_NULL:
     case EKIND_BOOLEAN:
-      return GenNode(result);
-    default:
-      DCHECK(ret);
-      return ret;
-  }
-}
-
-ast::AST* ConstantFold::FoldTernary( ast::Ternary* node , zone::Zone* zone ,
-                                                          std::string* error ) {
-  m_zone = zone;
-  m_error= error;
-
-  FoldResult result;
-  ast::AST* ret = Fold(node,&result);
-
-  switch(result.kind) {
-    case EKIND_ERROR: return NULL;
-    case EKIND_REAL:
-    case EKIND_INTEGER:
-    case EKIND_STRING:
-    case EKIND_BOOLEAN:
+      DCHECK(!ret);
       return GenNode(result);
     default:
       DCHECK(ret);
@@ -538,14 +575,11 @@ ast::AST* ConstantFold::FoldTernary( ast::Ternary* node , zone::Zone* zone ,
 } // namespace
 
 
-ast::AST*  Fold( ast::Binary* node , zone::Zone* zone , std::string* error ) {
-  ConstantFold folder;
-  return folder.FoldBinary(node,zone,error);
-}
-
-ast::AST*  Fold( ast::Ternary* node , zone::Zone* zone , std::string* error ) {
-  ConstantFold folder;
-  return folder.FoldTernary(node,zone,error);
+ast::AST* ConstantFold( ast::AST* node , zone::Zone* zone , std::string* error ) {
+  if(node) {
+    ConstantFolder folder;
+    return folder.Fold(node,zone,error);
+  } else return NULL;
 }
 
 } // namespace vm
