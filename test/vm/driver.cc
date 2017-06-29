@@ -57,25 +57,39 @@ void Driver( const char* folder ) {
   size_t count = 0;
   size_t ok = 0;
   Engine engine;
-  for( boost::filesystem::directory_iterator itr(folder) ; itr !=
-      boost::filesystem::directory_iterator() ; ++itr ) {
-    if( boost::filesystem::is_regular_file( itr->status() ) ) {
-      if(IsValidVCLFile(*itr)) {
-        ++count;
-        std::cerr<<"Processing "<<itr->path().c_str()<<'\n';
-        std::string content;
-        boost::scoped_ptr<Context> context(CompileCode(&engine,itr->path().c_str()));
-        if(context) {
-          context->AddOrUpdateGlobalVariable("assert",Value(context->gc()->New<Assert>()));
-          Value v;
-          CHECK( context->Construct() );
-          MethodStatus status = CallFunc(context.get(),"test",&v);
-          if(!status) { std::cerr<<"test function failed:"<<status.fail()<<'\n'; }
-          else { ++ok; }
-          (void)v;
+
+  if( boost::filesystem::status(folder).type() == boost::filesystem::regular_file ) {
+    boost::scoped_ptr<Context> context(CompileCode(&engine,folder));
+    if(context) {
+      context->AddOrUpdateGlobalVariable("assert",Value(context->gc()->New<Assert>()));
+      Value v;
+      CHECK( context->Construct() );
+      MethodStatus status = CallFunc(context.get(),"test",&v);
+      if(!status) { std::cerr<<"test function failed:"<<status.fail()<<'\n'; }
+      else { ++ok; }
+      (void)v;
+    }
+  } else {
+    for( boost::filesystem::directory_iterator itr(folder) ; itr !=
+        boost::filesystem::directory_iterator() ; ++itr ) {
+      if( boost::filesystem::is_regular_file( itr->status() ) ) {
+        if(IsValidVCLFile(*itr)) {
+          ++count;
+          std::cerr<<"Processing "<<itr->path().c_str()<<'\n';
+          std::string content;
+          boost::scoped_ptr<Context> context(CompileCode(&engine,itr->path().c_str()));
+          if(context) {
+            context->AddOrUpdateGlobalVariable("assert",Value(context->gc()->New<Assert>()));
+            Value v;
+            CHECK( context->Construct() );
+            MethodStatus status = CallFunc(context.get(),"test",&v);
+            if(!status) { std::cerr<<"test function failed:"<<status.fail()<<'\n'; }
+            else { ++ok; }
+            (void)v;
+          }
+        } else {
+          std::cerr<<"Skipping file "<<itr->path().filename().string()<<'\n';
         }
-      } else {
-        std::cerr<<"Skipping file "<<itr->path().filename().string()<<'\n';
       }
     }
   }

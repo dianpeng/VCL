@@ -6,7 +6,7 @@
 #include <iterator>
 #include <boost/scoped_array.hpp>
 #include <boost/format.hpp>
-#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 
 namespace vcl {
 namespace util{
@@ -135,13 +135,15 @@ FilePathStatus GetFilePathStatus( const std::string& path ) {
     return FILE_PATH_RELATIVE;
 }
 
-std::string RealToString( double real , size_t precision ) {
-  std::ostringstream formatter;
-  formatter << std::fixed << std::setprecision(precision);
-  formatter << real;
-  std::string ret = formatter.str();
-  boost::trim_right_if(ret,boost::is_any_of("0"));
-  return ret;
+// In the future we can control the precision of showing real number
+std::string RealToString( double real ) {
+  try {
+    return boost::lexical_cast<std::string>(real);
+  } catch(...) {
+    std::stringstream formatter;
+    formatter<<real;
+    return formatter.str();
+  }
 }
 
 } // namespace util

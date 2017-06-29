@@ -154,10 +154,7 @@ inline std::string Size::ToString( const Size& size ) {
   return formatter.str();
 }
 
-// A function that converts a double value into a std::string which also
-// accepts how many precision you want to have. It is used to show double
-// value in a more human readable way but lose some precision.
-std::string RealToString( double , size_t precision = 8 );
+std::string RealToString( double );
 
 // Format APIs ==================================================
 void FormatV( std::string* , const char* , va_list );

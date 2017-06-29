@@ -376,6 +376,9 @@ TEST(Compiler,For) {
         }
        }
     );
+  CC( vcl 4.0;
+      global a = -2.0 / 2.0 == 1.0;
+    );
 }
 
 

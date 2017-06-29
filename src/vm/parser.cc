@@ -765,7 +765,12 @@ ast::AST* Parser::ParseTernary() {
 }
 
 ast::AST* Parser::ParseExpression() {
-  return ConstantFold(ParseBinary(),m_zone,m_error);
+  std::string error;
+  ast::AST* ret = ConstantFold(ParseBinary(),m_zone,&error);
+  if(!ret) {
+    ParserError("%s",error.c_str());
+    return NULL;
+  } else return ret;
 }
 
 const int kPrecedence[] = {
@@ -840,7 +845,7 @@ ast::AST* Parser::ParseUnary() {
       ret->ops.Add( m_zone , m_lexer.lexeme().token );
       token = m_lexer.Next().token;
     } while( token == TK_ADD || token == TK_SUB || token == TK_NOT );
-    ret->operand = ParseExpression();
+    ret->operand = ParseAtomic();
     if(!ret->operand) return NULL;
     return ret;
   }
