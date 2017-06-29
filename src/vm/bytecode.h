@@ -164,7 +164,7 @@ class BytecodeBuffer {
 
  public:
   static void Emit( uint32_t arg , uint8_t* pos )  {
-    uint8_t cp1 = arg & 0xff;
+    uint8_t cp1 = (arg & 0xff);
     uint8_t cp2 = (arg & 0xff00)>>8;
     uint8_t cp3 = (arg & 0xff0000)>>16;
     pos[0]= cp1;
