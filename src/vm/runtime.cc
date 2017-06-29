@@ -825,11 +825,56 @@ MethodStatus Runtime::Main( Value* output , int64_t instr_count ) {
     m_v0 = Top(0);
     String* pstring;
     if(!Value::ConvertToString(context(),m_v0,&pstring)) {
-      result = MethodStatus::NewFail("type %s cannot be convert to string",
+      result = MethodStatus::NewFail("type %s cannot be converted to string",
                                      m_v0.type_name());
       goto fail;
     }
     m_v1.SetString(pstring);
+    Replace(m_v1);
+    next();
+  }
+
+  vm_instr(BC_CBOOL) {
+    m_v0 = Top(0);
+    bool val;
+    if(!Value::ConvertToBoolean(context(),m_v0,&val)) {
+      result = MethodStatus::NewFail("type %s cannot be converted to boolean",
+                                     m_v0.type_name());
+      goto fail;
+    }
+    m_v1.SetBoolean(val);
+    Replace(m_v1);
+    next();
+  }
+
+  vm_instr(BC_CINT) {
+    m_v0 = Top(0);
+    int64_t val;
+    if(!Value::ConvertToInteger(context(),m_v0,&val)) {
+      result = MethodStatus::NewFail("type %s cannot be converted to boolean",
+                                     m_v0.type_name());
+      goto fail;
+    }
+    m_v1.SetInteger(val);
+    Replace(m_v1);
+    next();
+  }
+
+  vm_instr(BC_CREAL) {
+    m_v0 = Top(0);
+    double val;
+    if(!Value::ConvertToReal(context(),m_v0,&val)) {
+      result = MethodStatus::NewFail("type %s cannot be converted to real",
+                                     m_v0.type_name());
+      goto fail;
+    }
+    m_v1.SetReal(val);
+    Replace(m_v1);
+    next();
+  }
+
+  vm_instr(BC_TYPE) {
+    m_v1.SetString( context()->gc()->NewString( Top(0).type_name() ) );
     Replace(m_v1);
     next();
   }

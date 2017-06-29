@@ -829,15 +829,56 @@ bool Compiler::CompileVariable( const vcl::util::CodeLocation& loc ,
   return true;
 }
 
+enum {
+  INTRINSIC_TO_STRING,
+  INTRINSIC_TO_BOOLEAN,
+  INTRINSIC_TO_INTEGER,
+  INTRINSIC_TO_REAL,
+  INTRINSIC_TYPE,
+  INTRINSIC_UNKNOWN
+};
+
 bool Compiler::CompileFuncCall( const ast::FuncCall& fc ) {
+  int intrinsic = INTRINSIC_UNKNOWN;
+
   if( fc.name ) {
-    if(!CompileVariable(fc.location,fc.name)) return false;
+    if(strcmp(fc.name->data(),"to_string")==0)
+      intrinsic = INTRINSIC_TO_STRING;
+    else if(strcmp(fc.name->data(),"to_boolean")==0)
+      intrinsic = INTRINSIC_TO_BOOLEAN;
+    else if(strcmp(fc.name->data(),"to_integer")==0)
+      intrinsic = INTRINSIC_TO_INTEGER;
+    else if(strcmp(fc.name->data(),"to_real")==0)
+      intrinsic = INTRINSIC_TO_REAL;
+    else {
+      if(!CompileVariable(fc.location,fc.name))
+        return false;
+    }
   }
   // Generate function call argument
   for( size_t i = 0 ; i < fc.argument.size() ; ++i ) {
     if(!Compile(*fc.argument[i])) return false;
   }
-  __ call(fc.location,static_cast<uint32_t>(fc.argument.size()));
+
+  switch(intrinsic) {
+    case INTRINSIC_TO_STRING:
+      __ cstr(fc.location);
+      break;
+    case INTRINSIC_TO_BOOLEAN:
+      __ cbool(fc.location);
+    case INTRINSIC_TO_INTEGER:
+      __ cint(fc.location);
+      break;
+    case INTRINSIC_TO_REAL:
+      __ creal(fc.location);
+      break;
+    case INTRINSIC_TYPE:
+      __ type(fc.location);
+      break;
+    default:
+      __ call(fc.location,static_cast<uint32_t>(fc.argument.size()));
+      break;
+  }
 
   if( fc.name ) {
     // It is a statment call, then we have to pop the return

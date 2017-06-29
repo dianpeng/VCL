@@ -15,7 +15,7 @@ sub test {
   }
   {
     declare x = "string";
-    assert('${100 + 10.01}' == "110.01");
+    assert('${x +"h"}' == "stringh");
   }
 
   new sub1 = sub { return {1}; };

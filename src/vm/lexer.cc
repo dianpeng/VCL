@@ -180,7 +180,13 @@ const Lexeme& Lexer::LexCode() {
       case '\n':
         m_ccount = 1; ++m_line; ++m_pos; break;
       case 0: YIELD(TK_EOF,0);
-      case '\'': YIELD(TK_INTERP_START,1);
+      case '\'':
+        if(m_state == LEXER_STATE_NORMAL)
+          YIELD(TK_INTERP_START,1);
+        else {
+          LexerError("Nested string interpolation is not allowed");
+          return m_lexeme;
+        }
       default:
         return LexVarOrKeyword();
     }

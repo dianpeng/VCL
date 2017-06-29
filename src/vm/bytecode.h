@@ -129,8 +129,13 @@ namespace vm  {
   /* Sub */ \
   __(BC_GSUB,1,gsub) \
   __(BC_LSUB,1,lsub) \
-  /* Specific instruction for interpolation */ \
+  /* Speical intrinsic */ \
   __(BC_CSTR,0,cstr) \
+  __(BC_CINT,0,cint) \
+  __(BC_CREAL,0,creal) \
+  __(BC_CBOOL,0,cbool) \
+  __(BC_TYPE,0,type) \
+  /* For string interpolation */ \
   __(BC_SCAT,1,scat)
 
 enum Bytecode {
