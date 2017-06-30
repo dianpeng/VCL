@@ -18,7 +18,8 @@ struct Duration {
   uint32_t second;
   uint32_t millisecond;
 
-  Duration( uint32_t h = 0 , uint32_t min = 0 , uint32_t s = 0 , uint32_t m = 0 ):
+  Duration( uint32_t h = 0 , uint32_t min = 0 , uint32_t s = 0 ,
+                                                uint32_t m = 0 ):
     hour(h),
     minute(min),
     second(s),

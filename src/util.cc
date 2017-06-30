@@ -21,10 +21,7 @@ void FormatPrefix( const std::string& source , const CodeLocation& loc ,
   // 2. Get the location/coordinate that we can highlight the error place
   output->append(
       (
-      boost::format("[%s]:\naround line %d and position %d ,close to source code:"
-        "\n\n-----------------------------------------------------------\n"
-        "%s"
-        "\n-----------------------------------------------------------\n\n")
+      boost::format("[%s]:\naround line %d and position %d ,close to source code:%s")
       % module
       % loc.line
       % loc.ccount
@@ -42,7 +39,8 @@ std::string GetCodeSnippetHighlight( const std::string& source ,
   size_t end   = source.size() <= (loc.position + kHalfBufferLength) ?
     source.size() : loc.position + kHalfBufferLength;
   std::string ret;
-  ret.reserve( (end-start) + 4 );
+  ret.reserve( (end-start) + 128 );
+  ret.append("\n\n-----------------------------------------------------------\n");
   {
     size_t position = 1;
     size_t line = 1;
@@ -74,6 +72,7 @@ std::string GetCodeSnippetHighlight( const std::string& source ,
     if(line > 1) {
       ret.append( source.substr(stop_pos,(end-stop_pos)) );
     }
+  ret.append("\n-----------------------------------------------------------\n\n");
   }
   return ret;
 }

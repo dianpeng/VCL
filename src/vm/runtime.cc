@@ -945,7 +945,6 @@ fail:
 
 void Runtime::UnwindStack( std::ostringstream* output ) const {
   int count = 0;
-
   for( std::vector<Frame>::const_reverse_iterator itr =
       m_frame.rbegin() ; itr != m_frame.rend() ; ++itr ) {
     const Frame& frame = *itr;
@@ -970,14 +969,7 @@ void Runtime::UnwindStack( std::ostringstream* output ) const {
       (*output)<<" argument-size:"<<frame.arg_size;
       (*output)<<" frame-base:"<<frame.base;
       (*output)<<" pc:"<<frame.pc;
-
-      if(count == 0) {
-        (*output)<<"\naround source code:\n"
-                 <<vcl::util::GetCodeSnippetHighlight(source_code->source_code,location)
-                 <<'\n';
-      } else {
-        (*output)<<'\n';
-      }
+      (*output)<<'\n';
     }
 
     ++count;
@@ -985,10 +977,32 @@ void Runtime::UnwindStack( std::ostringstream* output ) const {
 }
 
 MethodStatus Runtime::ReportError( const std::string& error ) const {
-  std::ostringstream formatter;
-  UnwindStack(&formatter);
-  return MethodStatus::NewFail("[runtime]: %s \n%s",error.c_str(),
-      formatter.str().c_str());
+  std::ostringstream unwind_stk;
+  std::string prefix;
+
+  // Get stack unwind information
+  UnwindStack(&unwind_stk);
+
+  {
+    std::ostringstream formatter;
+    const Frame& frame = m_frame.back();
+    if(frame.IsScriptFunction()) {
+      vcl::util::CodeLocation location =
+        frame.sub_routine()->procedure()->code_buffer().code_location(frame.pc);
+
+      boost::shared_ptr<SourceCodeInfo> source_code =
+        m_context->compiled_code()->IndexSourceCodeInfo(frame.source_index);
+
+      formatter<<"[runtime]: "<<error<<"\nIn source code file "
+               <<source_code->file_path<<" around line "<<location.line
+               <<" and position "<<location.ccount<<".\n"
+               << vcl::util::GetCodeSnippetHighlight( source_code->source_code , location )<<'\n';
+    } else {
+      formatter<<"[runtime]: "<<error<<'\n';
+    }
+    prefix = formatter.str();
+  }
+  return MethodStatus::NewFail("%s%s",prefix.c_str(),unwind_stk.str().c_str());
 }
 
 void Runtime::Mark() {

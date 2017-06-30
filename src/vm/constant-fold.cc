@@ -30,6 +30,11 @@ struct FoldResult {
     value(),
     location()
   {}
+
+  zone::ZoneString* string() const { return boost::get<zone::ZoneString*>(value); }
+  int64_t integer() const { return boost::get<int64_t>(value); }
+  double real() const { return boost::get<double>(value); }
+  bool boolean() const { return boost::get<bool>(value); }
 };
 
 class ConstantFolder {
@@ -72,13 +77,13 @@ ast::AST* ConstantFolder::GenNode( const FoldResult& value ) {
   switch(value.kind) {
     case EKIND_NULL: return new (m_zone) ast::Null(value.location);
     case EKIND_INTEGER:
-      return new (m_zone) ast::Integer(value.location,boost::get<int64_t>(value.value));
+      return new (m_zone) ast::Integer(value.location,value.integer());
     case EKIND_REAL:
-      return new (m_zone) ast::Real(value.location,boost::get<double>(value.value));
+      return new (m_zone) ast::Real(value.location,value.real());
     case EKIND_STRING:
-      return new (m_zone) ast::String(value.location,boost::get<zone::ZoneString*>(value.value));
+      return new (m_zone) ast::String(value.location,value.string());
     case EKIND_BOOLEAN:
-      return new (m_zone) ast::Boolean(value.location,boost::get<bool>(value.value));
+      return new (m_zone) ast::Boolean(value.location,value.boolean());
     default:
       VCL_UNREACHABLE();
       return NULL;
@@ -87,11 +92,11 @@ ast::AST* ConstantFolder::GenNode( const FoldResult& value ) {
 
 int64_t ConstantFolder::ToInteger( const FoldResult& value ) {
   if(value.kind == EKIND_INTEGER ) {
-    return boost::get<int64_t>(value.value);
+    return value.integer();
   } else if(value.kind == EKIND_REAL) {
-    return static_cast<int64_t>(boost::get<double>(value.value));
+    return static_cast<int64_t>(value.real());
   } else if(value.kind == EKIND_BOOLEAN) {
-    return boost::get<bool>(value.value) ? 1 : 0;
+    return static_cast<int64_t>(value.boolean());
   } else {
     VCL_UNREACHABLE();
     return 0;
@@ -100,11 +105,11 @@ int64_t ConstantFolder::ToInteger( const FoldResult& value ) {
 
 double ConstantFolder::ToReal( const FoldResult& value ) {
   if(value.kind == EKIND_REAL) {
-    return boost::get<double>(value.value);
+    return value.real();
   } else if(value.kind == EKIND_INTEGER) {
-    return static_cast<double>(boost::get<int64_t>(value.value));
+    return static_cast<double>(value.integer());
   } else if(value.kind == EKIND_BOOLEAN) {
-    return boost::get<bool>(value.value) ? 1.0 : 0.0;
+    return static_cast<double>(value.boolean());
   } else {
     VCL_UNREACHABLE();
     return 0;
@@ -113,9 +118,9 @@ double ConstantFolder::ToReal( const FoldResult& value ) {
 
 bool ConstantFolder::ToBoolean( const FoldResult& value ) {
   switch(value.kind) {
-    case EKIND_INTEGER: return boost::get<int64_t>(value.value) != 0;
-    case EKIND_REAL: return boost::get<double>(value.value) != 0.0;
-    case EKIND_BOOLEAN: return boost::get<bool>(value.value);
+    case EKIND_INTEGER: return value.integer() != 0;
+    case EKIND_REAL: return value.real() != 0.0;
+    case EKIND_BOOLEAN: return value.boolean();
     case EKIND_NULL: return false;
     case EKIND_STRING: return true;
     default: VCL_UNREACHABLE(); return false;
@@ -124,7 +129,7 @@ bool ConstantFolder::ToBoolean( const FoldResult& value ) {
 
 zone::ZoneString* ConstantFolder::ToString( const FoldResult& value ) {
   if(value.kind == EKIND_STRING) {
-    return boost::get<zone::ZoneString*>(value.value);
+    return value.string();
   } else {
     VCL_UNREACHABLE();
     return NULL;
@@ -198,9 +203,11 @@ ast::AST* ConstantFolder::Fold( ast::AST* node , FoldResult* result ) {
 
 ast::AST* ConstantFolder::Fold( ast::Binary* binary , FoldResult* result ) {
   FoldResult rhs_result;
-  ast::AST* lhs = Fold(binary->lhs,result);
+  ast::AST* lhs;
   ast::AST* rhs;
 
+  // 1. Folding the left hand side
+  lhs = Fold(binary->lhs,result);
   switch(result->kind) {
     case EKIND_ERROR:
       DCHECK(!lhs);
@@ -208,6 +215,16 @@ ast::AST* ConstantFolder::Fold( ast::Binary* binary , FoldResult* result ) {
     case EKIND_COMPLEX:
       DCHECK(lhs);
       binary->lhs = lhs;
+      {
+        // Here we still try to fold the right hand side value, though we know
+        // this node cannot be evaluated to constant value, but at least we can
+        // simpify our right hand side operand
+        ast::AST* rhs = Fold( binary->rhs , result );
+        if(result->kind == EKIND_ERROR)
+          return NULL;
+        binary->rhs = rhs ? rhs : GenNode(*result);
+      }
+      result->kind = EKIND_COMPLEX;
       return binary;
     default: break;
   }
@@ -225,9 +242,9 @@ ast::AST* ConstantFolder::Fold( ast::Binary* binary , FoldResult* result ) {
     break;
     case TK_OR: {
       bool lhs = ToBoolean(*result);
-      if(!lhs) {
+      if(lhs) {
         result->kind = EKIND_BOOLEAN;
-        result->value= false;
+        result->value= true;
         result->location = binary->location;
         return NULL;
       }
@@ -236,6 +253,7 @@ ast::AST* ConstantFolder::Fold( ast::Binary* binary , FoldResult* result ) {
     default: break;
   }
 
+  // 2. Folding the right hand side value
   rhs = Fold(binary->rhs,&rhs_result);
 
   switch(rhs_result.kind) {
@@ -253,33 +271,23 @@ ast::AST* ConstantFolder::Fold( ast::Binary* binary , FoldResult* result ) {
   switch(binary->op) {
     case TK_AND: {
       bool lhs = ToBoolean(*result);
-      if(!lhs) {
-        result->kind = EKIND_BOOLEAN;
-        result->value= false;
-        result->location = binary->location;
-        return NULL;
-      } else {
-        binary->rhs = GenNode(*result);
-        result->kind = EKIND_COMPLEX;
-        return binary;
-      }
+      bool rhs = ToBoolean(rhs_result);
+      result->kind = EKIND_BOOLEAN;
+      result->value = (lhs && rhs);
+      return NULL;
     }
     case TK_OR: {
       bool lhs = ToBoolean(*result);
-      if(!lhs) {
-        result->kind = EKIND_BOOLEAN;
-        result->value= false;
-        result->location = binary->location;
-        return NULL;
-      } else {
-        binary->rhs = GenNode(*result);
-        result->kind = EKIND_COMPLEX;
-        return binary;
-      }
+      bool rhs = ToBoolean(rhs_result);
+      result->kind = EKIND_BOOLEAN;
+      result->value= (lhs || rhs);
+      return NULL;
     }
     default: break;
   }
 
+
+  // 3. If applicable, do the actual binary constant fold
   if((result->kind == EKIND_NULL ||  rhs_result.kind == EKIND_NULL) &&
      (binary->op == TK_EQ || binary->op == TK_NE )) {
     result->kind = EKIND_BOOLEAN;
@@ -427,9 +435,9 @@ ast::AST* ConstantFolder::Fold( ast::Unary* node , FoldResult* result ) {
     case EKIND_BOOLEAN: case EKIND_INTEGER: {
       int64_t v;
       if(result->kind == EKIND_INTEGER)
-        v = boost::get<int64_t>(result->value);
+        v = result->integer();
       else
-        v = boost::get<bool>(result->value) ? 1 : 0;
+        v = static_cast<int64_t>(result->boolean());
 
       for( size_t i = 0 ; i < node->ops.size() ; ++i ) {
         switch( node->ops[i] ) {
@@ -450,7 +458,7 @@ ast::AST* ConstantFolder::Fold( ast::Unary* node , FoldResult* result ) {
     }
     break;
     case EKIND_REAL: {
-      double v = boost::get<double>(result->value);
+      double v = result->real();
 
       for( size_t i = 0 ; i < node->ops.size(); ++i ) {
         switch(node->ops[i]) {
@@ -524,10 +532,24 @@ ast::AST* ConstantFolder::Fold( ast::Ternary* node , FoldResult* result ) {
     case EKIND_COMPLEX:
       DCHECK(cond);
       node->condition = cond;
+      {
+        ast::AST* first;
+        ast::AST* second;
+        first = Fold(node->first,result);
+        if(result->kind == EKIND_ERROR)
+          return NULL;
+        node->first = first ? first : GenNode(*result);
+        second = Fold(node->second,result);
+        if(result->kind == EKIND_ERROR)
+          return NULL;
+        node->second = second ? second : GenNode(*result);
+      }
+      result->kind = EKIND_COMPLEX;
       return node;
     default:
       break;
   }
+
   bool condition = ToBoolean(*result);
   if(condition) {
     FoldResult first_result;
