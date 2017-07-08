@@ -10,6 +10,7 @@
 #include <iostream>
 #include <new>
 #include <cstdlib>
+#include <limits>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
@@ -344,16 +345,15 @@ template< typename T > class Handle VCL_FINAL {
   T* m_value;
   GC* m_gc;
   RootNodeListIterator m_iterator;
-
 };
 
 
-// Value is the core *value* type structure for the whole library. It is a *any*
-// handler that is able to hold any type of value inside of the VCL script. It
-// provides type assertion , boxing and unboxing method for user to interact
-// with the virtual machine and runtime. The Value is also copyalbe and assianble
-// as well. Value object doesn't handle any heap memory , the memory is handled
-// by the GC owned by specific context.
+// Value represents anything inside of VCL script. It is a holder that can be
+// used to store any types of value and also it is the type that is used inside
+// of the interpreter's stack. Internally , Value object is represented as nan-tagging
+// pointer compared to our older version , which directly uses boost::variant.
+// This new representation makes our assembly based interepter easier to write and
+// also the memory footprint is smaller which leads to better cache efficiency.
 class Value VCL_FINAL {
  public:
   Value():
@@ -361,13 +361,8 @@ class Value VCL_FINAL {
     m_type(TYPE_NULL)
   {}
 
-  explicit Value( int64_t value ):
+  explicit Value( int32_t value ):
     m_value(value),
-    m_type (TYPE_INTEGER)
-  {}
-
-  explicit Value( int value ):
-    m_value(static_cast<int64_t>(value)),
     m_type (TYPE_INTEGER)
   {}
 
@@ -431,9 +426,9 @@ class Value VCL_FINAL {
 #undef __ // __
 
   // Getters
-  int64_t GetInteger() const {
+  int32_t GetInteger() const {
     DCHECK(IsInteger());
-    return boost::get<int64_t>(m_value);
+    return boost::get<int32_t>(m_value);
   }
   double GetReal() const {
     DCHECK(IsReal());
@@ -463,7 +458,7 @@ class Value VCL_FINAL {
   inline Iterator* GetIterator() const;
 
   // Setters
-  void SetInteger( int64_t value ) {
+  void SetInteger( int32_t value ) {
     m_value = value;
     m_type = TYPE_INTEGER;
   }
@@ -552,7 +547,7 @@ class Value VCL_FINAL {
 
   MethodStatus ToString (Context* , std::string* ) const;
   MethodStatus ToBoolean(Context* , bool* ) const;
-  MethodStatus ToInteger(Context* , int64_t* ) const;
+  MethodStatus ToInteger(Context* , int32_t* ) const;
   MethodStatus ToReal   (Context* , double*  ) const;
   MethodStatus ToDisplay(Context* , std::ostream* output ) const;
 
@@ -572,18 +567,24 @@ class Value VCL_FINAL {
   // use these conversion function via builtin functions. I leave the implementation
   // here simply for convinient purpose to implement string interprolation.
   static bool ConvertToString (Context* , const Value& , String** );
-  static bool ConvertToInteger(Context* , const Value& , int64_t* );
+  static bool ConvertToInteger(Context* , const Value& , int32_t* );
   static bool ConvertToReal   (Context* , const Value& , double*  );
   static bool ConvertToBoolean(Context* , const Value& , bool*    );
 
+  // This function is used to cast a size_t value which may be very large
+  // and cannot be held in int32_t type to a Value object without losing
+  // precision.
+  //
+  // What it does is it checks the actual value of the size_t value , if it
+  // is overflowed in int32_t, then it will store it inside of Value as
+  // double type. Otherwise just use int32_t to store it.
+  static inline void CastSizeToValueNoLostPrecision( Context* , size_t , Value* );
  private:
-  Object* object() const {
-    return boost::get<Object*>(m_value);
-  }
+  Object* object() const { return boost::get<Object*>(m_value); }
 
  private:
   boost::variant<Object*,
-                 int64_t,
+                 int32_t,
                  double,
                  bool,
                  vcl::util::Duration,
@@ -691,7 +692,7 @@ class Object {
   // Conversion Operations
   virtual MethodStatus ToString( Context* , std::string* ) const;
   virtual MethodStatus ToBoolean(Context* , bool* ) const;
-  virtual MethodStatus ToInteger(Context* , int64_t* ) const;
+  virtual MethodStatus ToInteger(Context* , int32_t* ) const;
   virtual MethodStatus ToReal   (Context* , double* ) const;
   virtual MethodStatus ToDisplay(Context* , std::ostream* output) const;
 
@@ -1241,7 +1242,15 @@ class StringDict VCL_FINAL {
 
 class List VCL_FINAL : public Object {
  public:
-  static const size_t kMaximumListSize = 1024*1024*4; // 4MB objects
+  static const size_t kMaximumListSize =
+#ifdef VCL_MAXIMUM_LIST_SIZE
+    VCL_MAXIMUM_LIST_SIZE
+#else
+    1024 * 4 * 64
+#endif // VCL_MAXIMUM_LIST_SIZE
+    ;
+
+  BOOST_STATIC_ASSERT( kMaximumListSize < std::numeric_limits<int32_t>::max() );
 
   virtual MethodStatus GetIndex( Context* , const Value& , Value* ) const;
   virtual MethodStatus SetIndex( Context* , const Value& , const Value& );
@@ -1339,6 +1348,16 @@ class ListIterator : public Iterator {
 class Dict VCL_FINAL : public Object {
   typedef StringDict<Value> DictType;
  public:
+  static const size_t kMaximumDictSize =
+#ifdef VCL_MAXIMUM_DICT_SIZE
+    VCL_MAXIMUM_DICT_SIZE
+#else
+    1024 * 4 * 64
+#endif // VCL_MAXIMUM_DICT_SIZE
+    ;
+
+  BOOST_STATIC_ASSERT( kMaximumDictSize < std::numeric_limits<int32_t>::max() );
+
   // Property
   virtual MethodStatus GetProperty( Context* , const String& , Value* ) const;
   virtual MethodStatus SetProperty( Context* , const String& , const Value& );
@@ -2747,6 +2766,16 @@ inline void Value::SetSubRoutine( SubRoutine* value ) {
 inline void Value::SetIterator( Iterator* value ) {
   m_type = TYPE_ITERATOR;
   m_value = static_cast<Object*>(value);
+}
+
+inline void Value::CastSizeToValueNoLostPrecision( Context* context ,
+                                                   size_t   value   ,
+                                                   Value* output ) {
+  if(value > static_cast<size_t>( std::numeric_limits<int32_t>::max())) {
+    output->SetReal( static_cast<double>(value) );
+  } else {
+    output->SetInteger(static_cast<int32_t>(value));
+  }
 }
 
 template< typename T , typename Hasher >

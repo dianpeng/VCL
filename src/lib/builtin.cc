@@ -72,7 +72,7 @@ class FunctionToInteger : public Function {
     }
 
     Value arg = context->GetArgument(0);
-    int64_t ival;
+    int32_t ival;
     if(Value::ConvertToInteger(context,arg,&ival)) {
       output->SetInteger(ival);
       return MethodStatus::kOk;
@@ -295,7 +295,7 @@ class ForeverLoop : public Iterator {
     value->SetInteger(m_index);
   }
  private:
-  int64_t m_index;
+  int32_t m_index;
 };
 
 class FunctionLoop : public Function {
@@ -370,6 +370,11 @@ class ListPush : public Function {
                                    "first argument must be a list");
     }
     List* l = context->GetArgument(0).GetList();
+    if( l->size() >= List::kMaximumListSize ) {
+      return MethodStatus::NewFail("function::list.push cannot push more to list,"
+                                   "the list is too long and you can have a list "
+                                   "no longer than %zu",List::kMaximumListSize);
+    }
     l->Push( context->GetArgument(1) );
     output->SetTrue();
     return MethodStatus::kOk;
@@ -466,9 +471,9 @@ class ListSlice : public Function {
                                    "second and third argument must be a integer");
     }
     List* l = context->GetArgument(0).GetList();
-    int64_t start = context->GetArgument(1).GetInteger();
-    int64_t end = context->GetArgument(2).GetInteger();
-    int64_t len = static_cast<int64_t>(l->size());
+    int32_t start = context->GetArgument(1).GetInteger();
+    int32_t end = context->GetArgument(2).GetInteger();
+    int32_t len = static_cast<int32_t>(l->size());
 
     // Clamp the value to be in valid range
     if(start <0) start = 0;
@@ -500,9 +505,9 @@ class ListRange: public Function {
                                    "first,second and third arguments must be "
                                    "integer!");
     }
-    int64_t start = context->GetArgument(0).GetInteger();
-    int64_t end   = context->GetArgument(1).GetInteger();
-    int64_t step  = context->GetArgument(2).GetInteger();
+    int32_t start = context->GetArgument(0).GetInteger();
+    int32_t end   = context->GetArgument(1).GetInteger();
+    int32_t step  = context->GetArgument(2).GetInteger();
 
     // Check whether the loop will stop or not
     if( std::abs( end - (start+step) ) >= std::abs( end-start ) ) {
@@ -510,7 +515,7 @@ class ListRange: public Function {
                                    "form a close range!");
     }
 
-    int64_t count = std::abs( end - start ) / std::abs( step );
+    int32_t count = std::abs( end - start ) / std::abs( step );
     if( static_cast<size_t>(count) >= List::kMaximumListSize ) {
       return MethodStatus::NewFail("function::list.range range is too large,you "
                                    "can only specify list no larger than %zu",
@@ -577,7 +582,7 @@ class ListSize : public Function {
                                    "and first argument must be a list");
     }
     List* l = context->GetArgument(0).GetList();
-    output->SetInteger( static_cast<int64_t>( l->size() ) );
+    output->SetInteger( static_cast<int32_t>( l->size() ) );
     return MethodStatus::kOk;
   }
 };
@@ -672,7 +677,9 @@ class FunctionGCSize : public Function {
     if( context->GetArgumentSize() != 0 ) {
       return MethodStatus::NewFail("function::gc.gc_size requires 0 argument");
     }
-    output->SetInteger( static_cast<int64_t>( context->gc()->gc_size() ) );
+    Value::CastSizeToValueNoLostPrecision(context,
+                                          context->gc()->gc_size(),
+                                          output);
     return MethodStatus::kOk;
   }
 };
@@ -684,7 +691,9 @@ class FunctionGCTrigger : public Function {
     if( context->GetArgumentSize() != 0 ) {
       return MethodStatus::NewFail("function::gc.gc_trigger requires 0 argument");
     }
-    output->SetInteger( static_cast<int64_t>( context->gc()->next_gc_trigger() ) );
+    Value::CastSizeToValueNoLostPrecision(context,
+                                          context->gc()->next_gc_trigger(),
+                                          output);
     return MethodStatus::kOk;
   }
 };
@@ -696,7 +705,10 @@ class FunctionGCTimes : public Function {
     if( context->GetArgumentSize() != 0 ) {
       return MethodStatus::NewFail("function::gc.gc_times requires 0 argument");
     }
-    output->SetInteger( static_cast<int64_t>( context->gc()->gc_times() ) );
+    output->SetInteger( static_cast<int32_t>( context->gc()->gc_times() ) );
+    Value::CastSizeToValueNoLostPrecision(context,
+                                          context->gc()->gc_times(),
+                                          output);
     return MethodStatus::kOk;
   }
 };
@@ -885,7 +897,7 @@ class FunctionSize : public Function {
       return MethodStatus::NewFail("function::dict.size expects 1 argument,"
                                    "and it must be a dictionary");
     }
-    output->SetInteger( static_cast<int64_t>(
+    output->SetInteger( static_cast<int32_t>(
           context->GetArgument(0).GetDict()->size()));
     return MethodStatus::kOk;
   }
@@ -945,7 +957,7 @@ class FunctionSize : public Function {
       return MethodStatus::NewFail("function::string.size expects 1 argument,"
                                    "and it must be string");
     }
-    output->SetInteger( static_cast<int64_t>(
+    output->SetInteger( static_cast<int32_t>(
           context->GetArgument(0).GetString()->size()) );
     return MethodStatus::kOk;
   }
@@ -1073,9 +1085,9 @@ class FunctionSlice : public Function {
                                    "second and third argument must be integer");
     }
     String* str = context->GetArgument(0).GetString();
-    int64_t len  = static_cast<int64_t>( str->size() );
-    int64_t start= context->GetArgument(1).GetInteger();
-    int64_t end  = context->GetArgument(2).GetInteger();
+    int32_t len  = static_cast<int32_t>( str->size() );
+    int32_t start= context->GetArgument(1).GetInteger();
+    int32_t end  = context->GetArgument(2).GetInteger();
 
     // Clamp the value to be in valid range
     if(start <0) start = 0;
@@ -1101,8 +1113,8 @@ class FunctionIndex : public Function {
                                    "second argument must be integer");
     }
     String* str = context->GetArgument(0).GetString();
-    int64_t index = context->GetArgument(1).GetInteger();
-    int64_t len = static_cast<int64_t>( str->size() );
+    int32_t index = context->GetArgument(1).GetInteger();
+    int32_t len = static_cast<int32_t>( str->size() );
     if( index >= len || index < 0 ) {
       return MethodStatus::NewFail("function::string.index out of bound!");
     }
@@ -1155,7 +1167,7 @@ class FunctionNowInMicroSeconds : public Function {
     {
       struct timespec tv;
       clock_gettime(CLOCK_MONOTONIC,&tv);
-      output->SetInteger(static_cast<int64_t>(tv.tv_sec*1000000 + tv.tv_nsec / 1000));
+      output->SetInteger(static_cast<int32_t>(tv.tv_sec*1000000 + tv.tv_nsec / 1000));
     }
     return MethodStatus::kOk;
   }

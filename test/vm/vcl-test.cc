@@ -853,7 +853,7 @@ TEST(VCL,ValueAPI_Primitive) {
   }
 
   {
-    int64_t i;
+    int32_t i;
     double r;
     ASSERT_TRUE( Value(1).ToInteger(NULL,&i) );
     ASSERT_EQ(1,i);

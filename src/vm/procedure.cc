@@ -60,7 +60,7 @@ void Procedure::Dump( std::ostream& output ) const {
     const detail::Value& v = m_lit_array[i];
     switch(v.which()) {
       case detail::VALUE_TYPE_INTEGER:
-        output<<(i)<<". "<<boost::get<int64_t>(v)<<'\n';
+        output<<(i)<<". "<<boost::get<int32_t>(v)<<'\n';
         break;
       case detail::VALUE_TYPE_REAL:
         output<<(i)<<". "<<boost::get<double>(v)<<'\n';

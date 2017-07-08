@@ -123,7 +123,7 @@ inline bool TokenIsLogicOperator( Token tk ) {
 struct Lexeme {
   Token token;
   boost::variant<
-    int64_t,
+    int32_t,
     double,
     std::string,
     bool,
@@ -135,8 +135,8 @@ struct Lexeme {
   // underlying it is
   std::string symbol() const;
 
-  int64_t integer() const {
-    return boost::get<int64_t>(value);
+  int32_t integer() const {
+    return boost::get<int32_t>(value);
   }
   double real() const {
     return boost::get<double>(value);

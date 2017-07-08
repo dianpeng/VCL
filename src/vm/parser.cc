@@ -179,7 +179,7 @@ ast::AST* Parser::ParseACL() {
             return NULL;
           }
           {
-            int64_t m = m_lexer.lexeme().integer();
+            int32_t m = m_lexer.lexeme().integer();
             if(m <0 || m > 128) {
               ParserError("Network mask must be in range [0,128]!");
               return NULL;

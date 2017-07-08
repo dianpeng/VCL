@@ -27,6 +27,30 @@ namespace vm  {
 // ------
 
 #define VCL_BYTECODE_LIST(__) \
+  /* Typed bytecode for interpreter to generate */ \
+  /* faster inlined operations */ \
+  __(BC_ADDIV,1,addiv) \
+  __(BC_ADDVI,1,addvi) \
+  __(BC_SUBIV,1,subiv) \
+  __(BC_SUBVI,1,subvi) \
+  __(BC_MULIV,1,muliv) \
+  __(BC_MULVI,1,mulvi) \
+  __(BC_DIVIV,1,diviv) \
+  __(BC_DIVVI,1,divvi) \
+  __(BC_MODIV,1,modiv) \
+  __(BC_MODVI,1,modvi) \
+  __(BC_LTVI,1,ltvi) \
+  __(BC_LTIV,1,ltiv) \
+  __(BC_LEVI,1,levi) \
+  __(BC_LEIV,1,leiv) \
+  __(BC_GTVI,1,gtvi) \
+  __(BC_GTIV,1,gtiv) \
+  __(BC_GEVI,1,gevi) \
+  __(BC_GEIV,1,geiv) \
+  __(BC_EQIV,1,eqiv) \
+  __(BC_EQVI,1,eqvi) \
+  __(BC_NEIV,1,neiv) \
+  __(BC_NEVI,1,nevi) \
   /* Arithmatic bytecode */ \
   __(BC_ADD,0,add) \
   __(BC_SUB,0,sub) \

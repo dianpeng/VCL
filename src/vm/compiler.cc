@@ -501,38 +501,85 @@ bool Compiler::Compile( const ast::Binary& binary ) {
   if(TokenIsLogicOperator(binary.op)) {
     return CompileLogic(binary);
   } else {
-    if(!Compile(*binary.lhs)) return false;
-    if(!Compile(*binary.rhs)) return false;
-    switch( binary.op ) {
-      case TK_ADD :
-        __ add(binary.location); break;
-      case TK_SUB:
-        __ sub(binary.location); break;
-      case TK_MUL:
-        __ mul(binary.location); break;
-      case TK_DIV:
-        __ div(binary.location); break;
-      case TK_MOD:
-        __ mod(binary.location); break;
-      case TK_LT:
-        __ lt(binary.location); break;
-      case TK_LE:
-        __ le(binary.location); break;
-      case TK_GT:
-        __ gt(binary.location); break;
-      case TK_GE:
-        __ ge(binary.location); break;
-      case TK_EQ:
-        __ eq(binary.location); break;
-      case TK_NE:
-        __ ne(binary.location); break;
-      case TK_MATCH:
-        __ match(binary.location); break;
-      case TK_NOT_MATCH:
-        __ nmatch(binary.location); break;
-      default:
-        VCL_UNREACHABLE();
-        return false;
+    // Check whether at least one of the operand is a constant integer value
+    // which has specialized instruction to fasten the operations later on
+    // during the interpreter generation
+    if(binary.lhs->type == ast::AST_INTEGER) {
+      if(!Compile(*binary.rhs)) return false;
+      int index = CompileLiteral(binary.lhs->location,
+          static_cast<const ast::Integer*>(binary.lhs)->value);
+      if(index <0) return false;
+      switch(binary.op) {
+        case TK_ADD: __ addiv(binary.location,index); break;
+        case TK_SUB: __ subiv(binary.location,index); break;
+        case TK_MUL: __ muliv(binary.location,index); break;
+        case TK_DIV: __ diviv(binary.location,index); break;
+        case TK_MOD: __ modiv(binary.location,index); break;
+        case TK_LT : __ ltiv (binary.location,index); break;
+        case TK_LE : __ leiv (binary.location,index); break;
+        case TK_GT : __ gtiv (binary.location,index); break;
+        case TK_GE : __ geiv (binary.location,index); break;
+        case TK_EQ : __ eqiv (binary.location,index); break;
+        case TK_NE : __ neiv (binary.location,index); break;
+        default:
+          ReportError(binary.location,"match/unmatch operator used with integer type");
+          return false;
+      }
+    } else if(binary.rhs->type == ast::AST_INTEGER) {
+      if(!Compile(*binary.lhs)) return false;
+      int index = CompileLiteral(binary.rhs->location,
+          static_cast<const ast::Integer*>(binary.rhs)->value);
+      if(index <0) return false;
+      switch(binary.op) {
+        case TK_ADD: __ addvi(binary.location,index); break;
+        case TK_SUB: __ subvi(binary.location,index); break;
+        case TK_MUL: __ mulvi(binary.location,index); break;
+        case TK_DIV: __ divvi(binary.location,index); break;
+        case TK_MOD: __ modvi(binary.location,index); break;
+        case TK_LT : __ ltvi (binary.location,index); break;
+        case TK_LE : __ levi (binary.location,index); break;
+        case TK_GT : __ gtvi (binary.location,index); break;
+        case TK_GE : __ gevi (binary.location,index); break;
+        case TK_EQ : __ eqvi (binary.location,index); break;
+        case TK_NE : __ nevi (binary.location,index); break;
+        default:
+          ReportError(binary.location,"match/unmatch operator used with integer type");
+          return false;
+      }
+    } else {
+      if(!Compile(*binary.lhs)) return false;
+      if(!Compile(*binary.rhs)) return false;
+      switch( binary.op ) {
+        case TK_ADD :
+          __ add(binary.location); break;
+        case TK_SUB:
+          __ sub(binary.location); break;
+        case TK_MUL:
+          __ mul(binary.location); break;
+        case TK_DIV:
+          __ div(binary.location); break;
+        case TK_MOD:
+          __ mod(binary.location); break;
+        case TK_LT:
+          __ lt(binary.location); break;
+        case TK_LE:
+          __ le(binary.location); break;
+        case TK_GT:
+          __ gt(binary.location); break;
+        case TK_GE:
+          __ ge(binary.location); break;
+        case TK_EQ:
+          __ eq(binary.location); break;
+        case TK_NE:
+          __ ne(binary.location); break;
+        case TK_MATCH:
+          __ match(binary.location); break;
+        case TK_NOT_MATCH:
+          __ nmatch(binary.location); break;
+        default:
+          VCL_UNREACHABLE();
+          return false;
+      }
     }
   }
   return true;

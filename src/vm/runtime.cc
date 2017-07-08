@@ -161,6 +161,116 @@ MethodStatus Runtime::Main( Value* output , int64_t instr_count ) {
     next();
   }
 
+  // ================================================================
+  // Bytecode for integer type speicalized and optimization
+  // ================================================================
+
+#define VERIFY_ARGUMENT(X) \
+  do { \
+    if((X) == 0) { \
+      result = MethodStatus::NewFail("divide zero!"); \
+      goto fail; \
+    } \
+  } while(false)
+
+#define VERIFY_EMPTY(X) (void)(X)
+
+#define DO(BC,OP,OPER,PRED) \
+  vm_instr(BC) { \
+    arg = code.arg(); \
+    int32_t lhs = procedure->IndexInteger(arg); \
+    m_v0 = Top(0); \
+    if(m_v0.IsInteger()) { \
+      PRED(m_v0.GetInteger()); \
+      Replace(Value(lhs OPER m_v0.GetInteger())); \
+    } else { \
+      verify((result = Value(lhs).OP(context(),m_v0,&m_v1))); \
+      Replace(m_v1); \
+    } \
+    next(); \
+  }
+
+  DO(BC_ADDIV,Add,+,VERIFY_EMPTY)
+  DO(BC_SUBIV,Sub,-,VERIFY_EMPTY)
+  DO(BC_MULIV,Mul,*,VERIFY_EMPTY)
+  DO(BC_DIVIV,Div,/,VERIFY_ARGUMENT)
+  DO(BC_MODIV,Mod,%,VERIFY_ARGUMENT)
+
+#undef DO // DO
+
+#define DO(BC,OP,OPER,PRED) \
+  vm_instr(BC) { \
+    arg = code.arg(); \
+    int32_t rhs = procedure->IndexInteger(arg); \
+    m_v0 = Top(0); \
+    if(m_v0.IsInteger()) { \
+      PRED(rhs); \
+      Replace(Value(m_v0.GetInteger() OPER rhs)); \
+    } else { \
+      verify((result = m_v0.OP(context(),Value(rhs),&m_v1))); \
+      Replace(m_v1); \
+    } \
+    next(); \
+  }
+
+  DO(BC_ADDVI,Add,+,VERIFY_EMPTY)
+  DO(BC_SUBVI,Sub,-,VERIFY_EMPTY)
+  DO(BC_MULVI,Mul,*,VERIFY_EMPTY)
+  DO(BC_DIVVI,Div,/,VERIFY_ARGUMENT)
+  DO(BC_MODVI,Mod,%,VERIFY_ARGUMENT)
+
+#undef DO // DO
+#undef VERIFY_EMPTY // VERIFY_EMPTY
+#undef VERIFY_ARGUMENT // VERIFY_ARGUMENT
+
+#define DO(BC,OP,OPER) \
+  vm_instr(BC) { \
+    arg = code.arg(); \
+    int32_t lhs = procedure->IndexInteger(arg); \
+    m_v0 = Top(0); \
+    if(m_v0.IsInteger()) { \
+      Replace(Value(lhs OPER m_v0.GetInteger())); \
+    } else { \
+      bool bret; \
+      verify((result = Value(lhs).OP(context(),m_v0,&bret))); \
+      Replace(Value(bret)); \
+    } \
+    next(); \
+  }
+
+  DO(BC_LTIV,Less,<)
+  DO(BC_LEIV,LessEqual,<=)
+  DO(BC_GTIV,Greater,>)
+  DO(BC_GEIV,GreaterEqual,>=)
+  DO(BC_EQIV,Equal,==)
+  DO(BC_NEIV,NotEqual,!=)
+
+#undef DO // DO
+
+#define DO(BC,OP,OPER) \
+  vm_instr(BC) { \
+    arg = code.arg(); \
+    int32_t rhs = procedure->IndexInteger(arg); \
+    m_v0 = Top(0); \
+    if(m_v0.IsInteger()) { \
+      Replace(Value(m_v0.GetInteger() OPER rhs)); \
+    } else { \
+      bool bret; \
+      verify((result = m_v0.OP(context(),Value(rhs),&bret))); \
+      Replace(Value(bret)); \
+    } \
+    next(); \
+  }
+
+  DO(BC_LTVI,Less,<)
+  DO(BC_LEVI,LessEqual,<=)
+  DO(BC_GTVI,Greater,>)
+  DO(BC_GEVI,GreaterEqual,>=)
+  DO(BC_EQVI,Equal,==)
+  DO(BC_NEVI,NotEqual,!=)
+
+#undef DO // DO
+
   vm_instr(BC_SADD) {
     verify((result = Back(code.arg()).SelfAdd( context(), Top(0))));
     Pop(1);
@@ -849,7 +959,7 @@ MethodStatus Runtime::Main( Value* output , int64_t instr_count ) {
 
   vm_instr(BC_CINT) {
     m_v0 = Top(0);
-    int64_t val;
+    int32_t val;
     if(!Value::ConvertToInteger(context(),m_v0,&val)) {
       result = MethodStatus::NewFail("type %s cannot be converted to boolean",
                                      m_v0.type_name());

@@ -21,7 +21,7 @@ enum ExpressionKind {
 struct FoldResult {
   ExpressionKind kind;
   boost::variant<zone::ZoneString*,
-                 int64_t,
+                 int32_t,
                  double,
                  bool> value;
   vcl::util::CodeLocation location;
@@ -32,7 +32,7 @@ struct FoldResult {
   {}
 
   zone::ZoneString* string() const { return boost::get<zone::ZoneString*>(value); }
-  int64_t integer() const { return boost::get<int64_t>(value); }
+  int32_t integer() const { return boost::get<int32_t>(value); }
   double real() const { return boost::get<double>(value); }
   bool boolean() const { return boost::get<bool>(value); }
 };
@@ -49,7 +49,7 @@ class ConstantFolder {
  private:
   void ReportError( const char* format , ... );
 
-  int64_t ToInteger( const FoldResult& value );
+  int32_t ToInteger( const FoldResult& value );
   double ToReal   ( const FoldResult& value );
   zone::ZoneString* ToString ( const FoldResult& value );
   bool ToBoolean( const FoldResult& value );
@@ -90,13 +90,13 @@ ast::AST* ConstantFolder::GenNode( const FoldResult& value ) {
   }
 }
 
-int64_t ConstantFolder::ToInteger( const FoldResult& value ) {
+int32_t ConstantFolder::ToInteger( const FoldResult& value ) {
   if(value.kind == EKIND_INTEGER ) {
     return value.integer();
   } else if(value.kind == EKIND_REAL) {
-    return static_cast<int64_t>(value.real());
+    return static_cast<int32_t>(value.real());
   } else if(value.kind == EKIND_BOOLEAN) {
-    return static_cast<int64_t>(value.boolean());
+    return static_cast<int32_t>(value.boolean());
   } else {
     VCL_UNREACHABLE();
     return 0;
@@ -306,8 +306,8 @@ ast::AST* ConstantFolder::Fold( ast::Binary* binary , FoldResult* result ) {
     }
 
     if(type == EKIND_INTEGER) {
-      int64_t lval = ToInteger(*result);
-      int64_t rval = ToInteger(rhs_result);
+      int32_t lval = ToInteger(*result);
+      int32_t rval = ToInteger(rhs_result);
       result->kind = EKIND_INTEGER;
       switch(binary->op) {
         case TK_ADD: result->value = (lval + rval); break;
@@ -433,11 +433,11 @@ ast::AST* ConstantFolder::Fold( ast::Unary* node , FoldResult* result ) {
 
   switch(result->kind) {
     case EKIND_BOOLEAN: case EKIND_INTEGER: {
-      int64_t v;
+      int32_t v;
       if(result->kind == EKIND_INTEGER)
         v = result->integer();
       else
-        v = static_cast<int64_t>(result->boolean());
+        v = static_cast<int32_t>(result->boolean());
 
       for( size_t i = 0 ; i < node->ops.size() ; ++i ) {
         switch( node->ops[i] ) {
@@ -484,7 +484,7 @@ ast::AST* ConstantFolder::Fold( ast::Unary* node , FoldResult* result ) {
         result->kind = EKIND_ERROR;
         return NULL;
       } else {
-        int64_t v = 1;
+        int32_t v = 1;
         for( size_t i = 1 ; i < node->ops.size(); ++i ) {
           switch(node->ops[i]) {
             case TK_ADD: flip = false; break;

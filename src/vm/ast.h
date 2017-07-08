@@ -534,8 +534,8 @@ struct StringConcat : public AST {
 };
 
 struct Integer : public AST {
-  int64_t value;
-  Integer( const vcl::util::CodeLocation& loc , int64_t v ):
+  int32_t value;
+  Integer( const vcl::util::CodeLocation& loc , int32_t v ):
     AST(loc,AST_INTEGER),
     value(v)
   {}

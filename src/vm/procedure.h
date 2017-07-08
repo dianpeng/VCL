@@ -22,7 +22,7 @@ class ZoneString;
 
 namespace detail {
 
-typedef boost::variant<int64_t,
+typedef boost::variant<int32_t,
                        double,
                        vcl::String*,
                        vcl::util::Size,
@@ -55,7 +55,7 @@ template<> struct type_to_rtype<T> { \
   typedef RT return_type; \
 };
 
-DEFINE_TYPE_MAP(int64_t,VALUE_TYPE_INTEGER,int64_t)
+DEFINE_TYPE_MAP(int32_t,VALUE_TYPE_INTEGER,int32_t)
 DEFINE_TYPE_MAP(double,VALUE_TYPE_REAL,double)
 DEFINE_TYPE_MAP(vcl::String*,VALUE_TYPE_STRING,vcl::String*)
 DEFINE_TYPE_MAP(vcl::util::Size,VALUE_TYPE_SIZE,const vcl::util::Size&)
@@ -115,8 +115,8 @@ class Procedure {
  public:
   int Add( vcl::ImmutableGC* gc , zone::ZoneString* str );
   int Add( vcl::ImmutableGC* gc , const std::string& );
-  int Add( int64_t value ) {
-    return AddImpl<int64_t,detail::PrimitiveComparator<int64_t> >(value);
+  int Add( int32_t value ) {
+    return AddImpl<int32_t,detail::PrimitiveComparator<int32_t> >(value);
   }
   int Add( double value ) {
     return AddImpl<double,detail::PrimitiveComparator<double> >(value);
@@ -142,8 +142,8 @@ class Procedure {
     return boost::get<T>(v);
   }
 
-  int64_t IndexInteger( int index ) const {
-    return Index<int64_t>(index);
+  int32_t IndexInteger( int index ) const {
+    return Index<int32_t>(index);
   }
 
   double IndexReal( int index ) const {

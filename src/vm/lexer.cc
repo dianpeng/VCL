@@ -337,10 +337,10 @@ const Lexeme& Lexer::LexNumPrefix() {
 
   // 3. Reach here we know it is a integer, so convert it to integer
   try {
-    m_lexeme.value = boost::lexical_cast<int64_t>(
+    m_lexeme.value = boost::lexical_cast<int32_t>(
         m_source.substr(m_pos,start-m_pos));
   } catch( ... ) {
-    return LexerError("cannot convert number written as %s to int64_t!",
+    return LexerError("cannot convert number written as %s to int32_t!",
         m_source.substr(m_pos,start-m_pos).c_str());
   }
   m_lexeme.token = TK_INTEGER;

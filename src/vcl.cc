@@ -180,7 +180,7 @@ template< typename T > bool OperatorImpl( Context* context ,
   switch(left.type()) {
     case TYPE_INTEGER:
       {
-        int64_t lhs = left.GetInteger();
+        int32_t lhs = left.GetInteger();
 
         // Check if we need to do type promotion
         if( right.IsReal() ) {
@@ -190,7 +190,7 @@ template< typename T > bool OperatorImpl( Context* context ,
           }
           output->SetReal(handler.Do(static_cast<double>(lhs),right.GetReal()));
         } else {
-          int64_t value;
+          int32_t value;
           if(!(*status = right.ToInteger(context,&value))) return false;
           if(!handler.CheckRHS(value)) {
             status->set_fail("divide 0");
@@ -229,13 +229,13 @@ template< typename T > bool OperatorImpl( Context* context ,
           output->SetReal( handler.Do( static_cast<double>(
                   left.GetBoolean() ? 1.0 : 0.0 ) , right.GetReal()) );
         } else {
-          int64_t value;
+          int32_t value;
           if(!(*status = right.ToInteger(context,&value))) return false;
           if(!handler.CheckRHS(value)) {
             status->set_fail("divide 0");
             return true;
           }
-          output->SetInteger( handler.Do( static_cast<int64_t>(
+          output->SetInteger( handler.Do( static_cast<int32_t>(
                   left.GetBoolean() ? 1 : 0 ), value ) );
         }
         *status = MethodStatus::kOk;
@@ -435,13 +435,13 @@ fail:
 }
 
 bool Value::ConvertToInteger( Context* context , const Value& value ,
-    int64_t* output ) {
+    int32_t* output ) {
   switch(value.type()) {
     case TYPE_INTEGER:
       *output = value.GetInteger();
       break;
     case TYPE_REAL:
-      *output = static_cast<int64_t>( value.GetReal() );
+      *output = static_cast<int32_t>( value.GetReal() );
       break;
     case TYPE_NULL:
       *output = 0;
@@ -451,7 +451,7 @@ bool Value::ConvertToInteger( Context* context , const Value& value ,
       break;
     case TYPE_STRING:
       try {
-        *output = boost::lexical_cast<int64_t>(value.GetString()->data());
+        *output = boost::lexical_cast<int32_t>(value.GetString()->data());
       } catch( ... ) {
         goto fail;
       }
@@ -579,11 +579,11 @@ MethodStatus ComparisonOp( Context* context , CompareCallback callback,
   switch(left.type()) {
     case TYPE_INTEGER:
       {
-        int64_t lhs = left.GetInteger();
+        int32_t lhs = left.GetInteger();
         if(right.IsReal()) {
           *output = handler.Do( static_cast<double>(lhs), right.GetReal() );
         } else {
-          int64_t value;
+          int32_t value;
           if(!(result = right.ToInteger(context,&value)))
             return result;
           *output = handler.Do( left.GetInteger(), value );
@@ -612,8 +612,8 @@ MethodStatus ComparisonOp( Context* context , CompareCallback callback,
         if(right.IsReal()) {
           *output = handler.Do( left.GetBoolean() ? 1.0 : 0.0 , right.GetReal() );
         } else {
-          int64_t lhs = left.GetBoolean() ? 1 : 0;
-          int64_t rhs;
+          int32_t lhs = left.GetBoolean() ? 1 : 0;
+          int32_t rhs;
           if(!(result = right.ToInteger(context,&rhs))) return result;
           *output = handler.Do( lhs , rhs );
         }
@@ -708,13 +708,13 @@ MethodStatus Value::ToBoolean(Context* context, bool* output) const {
   }
 }
 
-MethodStatus Value::ToInteger(Context* context, int64_t* output) const {
+MethodStatus Value::ToInteger(Context* context, int32_t* output) const {
   switch(m_type) {
     case TYPE_INTEGER:
       *output = GetInteger();
       return MethodStatus::kOk;
     case TYPE_REAL:
-      *output = static_cast<int64_t>(GetReal());
+      *output = static_cast<int32_t>(GetReal());
       return MethodStatus::kOk;
     case TYPE_NULL:
     case TYPE_SIZE:
@@ -722,7 +722,7 @@ MethodStatus Value::ToInteger(Context* context, int64_t* output) const {
       return MethodStatus::NewFail("type %s cannot convert to integer",
           type_name());
     case TYPE_BOOLEAN:
-      *output = static_cast<int64_t>(GetBoolean());
+      *output = static_cast<int32_t>(GetBoolean());
       return MethodStatus::kOk;
     default:
       return object()->ToInteger(context,output);
@@ -950,7 +950,7 @@ MethodStatus Object::ToBoolean( Context* context , bool* output ) const {
   return MethodStatus::kOk;
 }
 
-MethodStatus Object::ToInteger( Context* context , int64_t* output ) const {
+MethodStatus Object::ToInteger( Context* context , int32_t* output ) const {
   VCL_UNUSED(context);
   VCL_UNUSED(output);
   return MethodStatus::NewFail("type %s cannot convert to integer",
@@ -1161,7 +1161,7 @@ MethodStatus List::NewIterator(Context* context , Iterator** iterator) {
 MethodStatus List::GetIndex( Context* context , const Value& index ,
     Value* output ) const {
   MethodStatus result;
-  int64_t idx;
+  int32_t idx;
   if(!(result = index.ToInteger(context,&idx))) return result;
   if(idx<0 || static_cast<size_t>(idx) >= m_list.size())
     return MethodStatus::NewFail("index out of range ,list size is:%zu",
@@ -1173,7 +1173,7 @@ MethodStatus List::GetIndex( Context* context , const Value& index ,
 MethodStatus List::SetIndex(Context* context , const Value& index ,
     const Value& value ) {
   MethodStatus result;
-  int64_t idx;
+  int32_t idx;
   if(!(result = index.ToInteger(context,&idx))) return result;
   if(idx<0 || static_cast<size_t>(idx) >= m_list.size())
     return MethodStatus::NewFail("index out of range ,list size is:%zu",
@@ -1221,6 +1221,11 @@ MethodStatus Dict::GetProperty( Context* context , const String& key ,
 MethodStatus Dict::SetProperty( Context* context , const String& key ,
     const Value& value ) {
   VCL_UNUSED(context);
+  if( m_dict.size() >= kMaximumDictSize ) {
+    return MethodStatus::NewFail("Cannot add more entry into dictionary,"
+                                 "user can have a dictionary with no more "
+                                 "than %zu entries",kMaximumDictSize);
+  }
   m_dict.InsertOrUpdate(key,value);
   return MethodStatus::kOk;
 }
@@ -1247,6 +1252,11 @@ MethodStatus Dict::SetIndex( Context* context , const Value& key ,
   if(!key.ToString(context,&k)) {
     return MethodStatus::NewFail("type %s cannot be converted to string, which is "
                                  "required as a key for dictionary!",key.type_name());
+  }
+  if( m_dict.size() >= kMaximumDictSize ) {
+    return MethodStatus::NewFail("Cannot add more entry into dictionary,"
+                                 "user can have a dictionary with no more "
+                                 "than %zu entries",kMaximumDictSize);
   }
   m_dict.InsertOrUpdate( context->gc() , k , value );
   return MethodStatus::kOk;
