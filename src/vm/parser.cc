@@ -307,7 +307,9 @@ ast::AST* Parser::ParseSubDefinition( zone::ZoneString* name ) {
   if(m_lexer.lexeme().token == TK_LBRA) {
     if(!(sub->body = ParseChunk())) return NULL;
   } else {
-    ParserError("Your sub definition doesn't have a function body?");
+    ParserError("Sub-routine %s's definition doesn't have a function body or "
+                "you forget to put a \"{\" to start to define a body.",
+                name->data());
     return NULL;
   }
 
@@ -685,8 +687,9 @@ ast::AST* Parser::ParsePrefixCall() {
     fc->name = prefix;
     return fc;
   } else {
-    ParserError("Meaningless statement here, maybe you want to write a "
-        "function call here ?");
+    ParserError("Maybe forget to write a \";\" here?Or your statement "
+                "here cannot be understood by parser!Parser only expects "
+                "syntax express function call here or keyword prefixed statement.");
   }
   return NULL;
 }

@@ -29,26 +29,56 @@ void FormatPrefix( const std::string& source , const CodeLocation& loc ,
       ).str());
 }
 
+size_t FindNearestLineBreakBackward( const std::string& source ,
+    size_t start ) {
+  int istart = static_cast<int>(start); // Avoid overflow with unsigned
+  for( --istart ; istart >=0 ; --istart ) {
+    if(source[istart] == '\n') break;
+  }
+  if(istart <0) istart = 0;
+  return static_cast<size_t>(istart);
+}
+
+size_t FindNearestLineBreakForward( const std::string& source ,
+    size_t start ) {
+  int istart = static_cast<int>(start);
+  for( ; istart < static_cast<int>(source.size()) ; ++istart) {
+    if(source[istart] == '\n') break;
+  }
+  return static_cast<size_t>(istart);
+}
+
+
 } // namespace
 
 std::string GetCodeSnippetHighlight( const std::string& source ,
     const CodeLocation& loc ) {
+  static const char* kPrefix = " |   ";
   static size_t kHalfBufferLength = kSourceCodeSnippetLength / 2;
   size_t start = loc.position > kHalfBufferLength ?
     loc.position - kHalfBufferLength : 0;
+
   size_t end   = source.size() <= (loc.position + kHalfBufferLength) ?
     source.size() : loc.position + kHalfBufferLength;
+
+  start = FindNearestLineBreakBackward(source,start);
+  end   = FindNearestLineBreakForward (source,end  );
+
   std::string ret;
   ret.reserve( (end-start) + 128 );
-  ret.append("\n\n-----------------------------------------------------------\n");
+  ret.append("\n\n");
   {
     size_t position = 1;
     size_t line = 1;
     size_t stop_pos;
 
+    ret.append(kPrefix);
+
     for( stop_pos = start ; stop_pos < end ; ++stop_pos ) {
       if(source[stop_pos] == '\n') {
         ++line; position = 1;
+        ret.push_back('\n');
+        ret.append(kPrefix);
         if( line > 1 && stop_pos >= loc.position ) {
           // find next line break or just end up here
           for( ++stop_pos ; stop_pos < end ; ++stop_pos ) {
@@ -58,21 +88,11 @@ std::string GetCodeSnippetHighlight( const std::string& source ,
         }
       } else {
         ++position;
+        ret.push_back( source[stop_pos] );
       }
     }
 
-    if(line > 1) {
-      ret.append( source.substr(start,(stop_pos-start)) );
-    } else {
-      ret.append( source.substr(start,(end-start)) );
-    }
-
-    ret.append("\n^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
-
-    if(line > 1) {
-      ret.append( source.substr(stop_pos,(end-stop_pos)) );
-    }
-  ret.append("\n-----------------------------------------------------------\n\n");
+    ret.append("\n     ^^^^^^^^^^ error appears before this line ^^^^^^^^^^^\n");
   }
   return ret;
 }
