@@ -510,7 +510,7 @@ struct Stmt : public AST {
 };
 
 struct FuncCall : public AST {
-  FuncCall( const vcl::util::CodeLocation& loc ):
+  FuncCall( const vcl::util::CodeLocation& loc , bool m = false ):
     AST(loc,AST_FUNCCALL),
     name(NULL),
     argument()
@@ -639,6 +639,10 @@ struct File : public AST {
  private:
   VCL_DISALLOW_COPY_AND_ASSIGN(File);
 };
+
+// Helper function to create specialized AST object
+Declare* NewTempVariableDeclare( zone::Zone* , zone::ZoneString* , Prefix* ,
+    const vcl::util::CodeLocation& );
 
 // Serialize to s-expression to ease pain of future testing
 void ASTSerialize( const File& file , std::ostream* output );

@@ -16,7 +16,16 @@ sub t2 {
   assert( bar(10) == 20 );
 }
 
+sub t3 {
+  new a = foo;
+  new b = bar;
+
+  assert( a() == 10 );
+  assert( b(10) == 20 );
+}
+
 sub test {
   t1;
   t2;
+  t3;
 }

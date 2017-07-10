@@ -169,6 +169,24 @@ enum Bytecode {
 #undef __ // __
 };
 
+// Intrinsic function index
+
+#define INTRINSIC_FUNCTION_LIST(__) \
+  __(TO_BOOLEAN,"to_boolean",BC_CBOOL,cbool) \
+  __(TO_INTEGER,"to_integer",BC_CINT,cint) \
+  __(TO_REAL   ,"to_real"   ,BC_CREAL,creal) \
+  __(TO_STRING ,"to_string" ,BC_CSTR,cstr) \
+  __(TYPE      ,"type"      ,BC_TYPE,type)
+
+enum IntrinsicFunctionIndex {
+#define __(A,B,C,D) INTRINSIC_FUNCTION_##A ,
+  INTRINSIC_FUNCTION_LIST(__)
+#undef  __ // __
+  INTRINSIC_FUNCTION_UNKNOWN
+};
+
+IntrinsicFunctionIndex GetIntrinsicFunctionIndex( const char* );
+
 const char* BytecodeGetName( Bytecode );
 bool BytecodeHasOperand( Bytecode );
 

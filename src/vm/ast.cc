@@ -402,6 +402,14 @@ void ASTSerialize( const File& file , std::ostream* output ) {
   Serialize(file,0,output);
 }
 
+Declare* NewTempVariableDeclare( zone::Zone* zone , zone::ZoneString* name ,
+    Prefix* expr, const vcl::util::CodeLocation& loc ) {
+  Declare* ret = new (zone) Declare(loc);
+  ret->rhs = expr;
+  ret->variable = name;
+  return ret;
+}
+
 std::string Sub::FormatProtocol( const Sub& sub ) {
   std::string buffer;
   buffer.reserve( 128 );

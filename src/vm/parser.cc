@@ -9,6 +9,23 @@ namespace vm  {
 
 using namespace vcl::util;
 
+class Parser::EnterLexicalScope {
+ public:
+  EnterLexicalScope( Parser* self , ast::Chunk* chunk ):
+    m_parser(self),
+    m_prev_scope(self->m_lexical_scope)
+  { self->m_lexical_scope = chunk; }
+
+  ~EnterLexicalScope() {
+    m_parser->m_lexical_scope = m_prev_scope;
+  }
+
+ private:
+  Parser* m_parser;
+  ast::Chunk* m_prev_scope;
+  VCL_DISALLOW_COPY_AND_ASSIGN(EnterLexicalScope);
+};
+
 void Parser::ParserError( const char* format , ... ) {
   va_list vl;
   va_start(vl,format);
@@ -23,13 +40,23 @@ zone::ZoneString* Parser::GetAnonymousSubName( zone::Zone* zone ) const {
   std::stringstream formatter;
   formatter << "__anonymous_sub__" << m_rand_name_seed << "@";
   ++m_rand_name_seed;
-  return new (zone) zone::ZoneString( zone , formatter.str() );
+  return zone::ZoneString::New(zone,formatter.str());
+}
+
+zone::ZoneString* Parser::GetTempVariableName( zone::Zone* zone ) const {
+  std::stringstream formatter;
+  formatter << "__temp_variable__" << m_rand_name_seed << "@";
+  ++m_rand_name_seed;
+  return zone::ZoneString::New(zone,formatter.str());
 }
 
 ast::File* Parser::DoParse() {
   DCHECK(m_file == NULL);
+
   m_file = new (m_zone) ast::File(m_lexer.location());
   m_file->chunk = new (m_zone) ast::Chunk(m_lexer.location());
+  EnterLexicalScope enter_scope(this,m_file->chunk);
+
   m_lexer.Next(); // Very first lexing
 
   // 1. Check VCL version
@@ -505,6 +532,8 @@ ast::Chunk* Parser::ParseChunk() {
     return new (m_zone) ast::Chunk(m_lexer.location());
   } else {
     ast::Chunk* ck = new (m_zone) ast::Chunk(m_lexer.location());
+    EnterLexicalScope enter_scope(this,ck);
+
     do {
       ast::AST* statement = ParseStatementWithSemicolon();
       if(!statement) return NULL;
@@ -518,6 +547,28 @@ ast::Chunk* Parser::ParseChunk() {
       ck->location_end = m_lexer.location();
       m_lexer.Next();
       return ck;
+    }
+  }
+}
+
+ast::Chunk* Parser::ParseSingleStatementOrChunk() {
+  if(m_lexer.lexeme().token == TK_LBRA) {
+    return ParseChunk();
+  } else {
+    ast::Chunk* ret = new (m_zone) ast::Chunk(m_lexer.location());
+    if(m_lexer.lexeme().token == TK_SEMICOLON) {
+      // Empty statement sitaution
+      m_lexer.Next();
+      return ret;
+    } else {
+      EnterLexicalScope enter_scope(this,ret);
+      ast::AST* code = ParseStatementWithSemicolon();
+      if(code) {
+        ret->statement_list.Add(m_zone,code);
+        return ret;
+      } else {
+        return NULL;
+      }
     }
   }
 }
@@ -931,6 +982,12 @@ ast::FuncCall* Parser::ParseFuncCall() {
       new (m_zone) ast::FuncCall(m_lexer.location()));
 }
 
+ast::FuncCall* Parser::ParseMethodCall( ast::AST* arg ) {
+  ast::FuncCall* fc = new (m_zone) ast::FuncCall(m_lexer.location());
+  fc->argument.Add(m_zone,arg);
+  return ParseFuncCallArgument(fc);
+}
+
 ast::AST* Parser::ParseStringConcat() {
   DCHECK(m_lexer.lexeme().token == TK_STRING);
   zone::ZoneString* string = zone::ZoneString::New(m_zone,
@@ -950,10 +1007,7 @@ ast::AST* Parser::ParseStringConcat() {
 
 ast::Prefix* Parser::ParsePrefix( zone::ZoneString* prefix ,
     int* last_component ) {
-  DCHECK(m_lexer.lexeme().token == TK_DOT ||
-         m_lexer.lexeme().token == TK_LSQR ||
-         m_lexer.lexeme().token == TK_LPAR ||
-         m_lexer.lexeme().token == TK_COLON);
+  DCHECK(IsPrefixOperator(m_lexer.lexeme().token));
 
   ast::Prefix* ret = new (m_zone) ast::Prefix(m_lexer.location());
   ret->list.Add(m_zone,ast::Prefix::Component(prefix));
@@ -1002,6 +1056,66 @@ ast::Prefix* Parser::ParsePrefix( zone::ZoneString* prefix ,
         if(last_component)
           *last_component = ast::Prefix::Component::CALL;
         break;
+      case TK_FIELD:
+        {
+          ast::AST* self;
+          // The grammar a::b(c) is actually a syntax sugar , however to
+          // make this syntax sugar has good semantic is kind of tricky.
+          // The core here is the evaluation a::b can be very nasty due
+          // to user could chain as much prefix expression as they like.
+          // Grammar like , a.b.c.d.e.f::g is allowed.
+          //
+          // What we actually do here is we setup a temporary assignment
+          // AST in current lexical scope and assign a.b.c.d.e.f to that
+          // temporary variable, so an expression a.b.c.d.e.f::g() is same
+          // as :
+          //  __temp = a.b.c.d.e.f;
+          //  __temp.g( __temp );
+
+          if( ret->list.size() == 1 ) {
+            // This is slightly a optimization to avoid too much local variables
+            // when user just do one level of lookup. Basically for cases as :
+            // a::b() , we will not create a temporary variable to avoid vm overhead.
+            DCHECK( ret->list[0].tag == ast::Prefix::Component::DOT );
+            self = new (m_zone) ast::Variable(m_lexer.location(),ret->list.First().var);
+          } else {
+            zone::ZoneString* temp_name = GetTempVariableName(m_zone);
+
+            // 1. New temproary variable
+            DCHECK(m_lexical_scope);
+            m_lexical_scope->statement_list.Add(m_zone,
+                ast::NewTempVariableDeclare(m_zone,temp_name,ret,ret->location));
+
+            // 2. Create a new Prefix expression here to override the existed
+            // prefix expression
+            ret = new (m_zone) ast::Prefix(ret->location);
+            ret->list.Add(m_zone,ast::Prefix::Component(temp_name));
+
+            // 3. Create AST reference the temporary variable
+            self = new (m_zone) ast::Variable(m_lexer.location(),temp_name);
+          }
+
+          // Generate rest of the method call AST
+          if(!m_lexer.Try(TK_VAR)) {
+            ParserError("Expect a variable name after \"::\" operation!");
+            return NULL;
+          }
+          ret->list.Add(m_zone,ast::Prefix::Component(
+                zone::ZoneString::New(m_zone,m_lexer.lexeme().string()),
+                ast::Prefix::Component::DOT));
+          if(!m_lexer.Try(TK_LPAR)) {
+            ParserError("Expect function call argument list in method call "
+                "operation!");
+            return NULL;
+          }
+
+          ast::FuncCall* mc = ParseMethodCall(self);
+          ret->list.Add(m_zone,mc);
+
+          if(last_component)
+            *last_component = ast::Prefix::Component::CALL;
+        }
+        break;
       default:
         return ret;
     }
@@ -1041,39 +1155,50 @@ ast::Dict* Parser::ParseDict() {
   if(m_lexer.Next().token == TK_RBRA) {
     m_lexer.Next();
   } else {
+    ast::AST* key;
     ret->list.Reserve(m_zone,4);
     do {
       // Key parsing for Dictionary. The dictionary's key can be of these
       // 2 types.
       // 1. String Literal
-      // 2. An expression that is quoted by square bracket.
+      // 2. Variable name
+      // 3. An expression that is quoted by square bracket.
       //
       // The reason for why we cannot use a expression here is simply because
       // Fastly's sub-component accessing grammar is using ":" to do job. So
       // an expression a:bc is valid which leads to ambigious.
-      ast::AST* key;
-      if(m_lexer.lexeme().token == TK_STRING) {
-        key = new (m_zone) ast::String(
-            m_lexer.location(),
-            zone::ZoneString::New(m_zone,m_lexer.lexeme().string())
-            );
-        m_lexer.Next();
-      } else if(m_lexer.lexeme().token == TK_LSQR) {
-        if(m_lexer.Next().token == TK_RSQR) {
-          ParserError("Empty dictionary key here, you need to specify an "
-                      "expression to indicate the key!");
+      switch(m_lexer.lexeme().token) {
+        case TK_STRING:
+          key = new (m_zone) ast::String(
+              m_lexer.location(),
+              zone::ZoneString::New(m_zone,m_lexer.lexeme().string())
+              );
+          m_lexer.Next();
+          break;
+        case TK_VAR:
+          key = new (m_zone) ast::String(
+              m_lexer.location(),
+              zone::ZoneString::New(m_zone,m_lexer.lexeme().string())
+              );
+          m_lexer.Next();
+          break;
+        case TK_LSQR:
+          if(m_lexer.Next().token == TK_RSQR) {
+            ParserError("Empty dictionary key here, you need to specify an "
+                "expression to indicate the key!");
+            return NULL;
+          }
+          key = ParseExpression();
+          if(!m_lexer.Expect(TK_RSQR)) {
+            ParserError("Dictionary's key is not closed by the \"]\"!");
+            return NULL;
+          }
+          break;
+        default:
+          ParserError("Dictionary's key can only be 1) string literal or 2) "
+              "an expression wrapped by \"[\" and \"]\",eg: "
+              "[val1+val2]!");
           return NULL;
-        }
-        key = ParseExpression();
-        if(!m_lexer.Expect(TK_RSQR)) {
-          ParserError("Dictionary's key is not closed by the \"]\"!");
-          return NULL;
-        }
-      } else {
-        ParserError("Dictionary's key can only be 1) string literal or 2) "
-                    "an expression wrapped by \"[\" and \"]\",eg: "
-                    "[val1+val2]!");
-        return NULL;
       }
 
       if(!key) return NULL;

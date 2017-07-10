@@ -183,7 +183,8 @@ class LexicalScope {
   LexicalScope( Compiler* comp , Procedure* procedure,
       const vcl::util::CodeLocation& location ,
       bool no_pop = false ,
-      bool is_loop = false):
+      bool is_loop = false,
+      bool is_function = false):
     m_base(0),
     m_var (),
     m_parent(comp->m_lex_scope),
@@ -197,10 +198,27 @@ class LexicalScope {
     m_continues(),
     m_iter_prefix(0)
   {
-    m_base = m_parent ? m_parent->base() : 0;
+    if(!is_function) m_base = m_parent ? m_parent->base() : 0;
     comp->m_lex_scope = this;
     if(m_parent)
       m_is_in_loop = ( m_parent->m_is_direct_loop || m_parent->m_is_in_loop );
+  }
+
+  LexicalScope( Compiler* comp , Procedure* procedure ):
+    m_base(0),
+    m_var () ,
+    m_parent(comp->m_lex_scope),
+    m_procedure( procedure )   ,
+    m_location(),
+    m_compiler(comp),
+    m_no_pop  (true),
+    m_is_direct_loop(false),
+    m_is_in_loop(false),
+    m_breaks(),
+    m_continues(),
+    m_iter_prefix(0)
+  {
+    comp->m_lex_scope = this;
   }
 
   ~LexicalScope();
@@ -876,56 +894,33 @@ bool Compiler::CompileVariable( const vcl::util::CodeLocation& loc ,
   return true;
 }
 
-enum {
-  INTRINSIC_TO_STRING,
-  INTRINSIC_TO_BOOLEAN,
-  INTRINSIC_TO_INTEGER,
-  INTRINSIC_TO_REAL,
-  INTRINSIC_TYPE,
-  INTRINSIC_UNKNOWN
-};
 
 bool Compiler::CompileFuncCall( const ast::FuncCall& fc ) {
-  int intrinsic = INTRINSIC_UNKNOWN;
-
-  if( fc.name ) {
-    if(strcmp(fc.name->data(),"to_string")==0)
-      intrinsic = INTRINSIC_TO_STRING;
-    else if(strcmp(fc.name->data(),"to_boolean")==0)
-      intrinsic = INTRINSIC_TO_BOOLEAN;
-    else if(strcmp(fc.name->data(),"to_integer")==0)
-      intrinsic = INTRINSIC_TO_INTEGER;
-    else if(strcmp(fc.name->data(),"to_real")==0)
-      intrinsic = INTRINSIC_TO_REAL;
-    else {
-      if(!CompileVariable(fc.location,fc.name))
-        return false;
-    }
+  IntrinsicFunctionIndex intrinsic = INTRINSIC_FUNCTION_UNKNOWN;
+  if(fc.name) {
+    intrinsic = GetIntrinsicFunctionIndex(fc.name->data());
   }
+
+  if(intrinsic == INTRINSIC_FUNCTION_UNKNOWN) {
+    if(fc.name&&!CompileVariable(fc.location,fc.name))
+      return false;
+  }
+
   // Generate function call argument
   for( size_t i = 0 ; i < fc.argument.size() ; ++i ) {
     if(!Compile(*fc.argument[i])) return false;
   }
 
+  // Generate code for intrinsic function via special bytecode
+#define XX(A,B,C,D) case INTRINSIC_FUNCTION_##A : __ D(fc.location);
+
   switch(intrinsic) {
-    case INTRINSIC_TO_STRING:
-      __ cstr(fc.location);
-      break;
-    case INTRINSIC_TO_BOOLEAN:
-      __ cbool(fc.location);
-    case INTRINSIC_TO_INTEGER:
-      __ cint(fc.location);
-      break;
-    case INTRINSIC_TO_REAL:
-      __ creal(fc.location);
-      break;
-    case INTRINSIC_TYPE:
-      __ type(fc.location);
-      break;
+    INTRINSIC_FUNCTION_LIST(XX)
     default:
       __ call(fc.location,static_cast<uint32_t>(fc.argument.size()));
-      break;
   }
+
+#undef XX // XX
 
   if( fc.name ) {
     // It is a statment call, then we have to pop the return
@@ -1154,7 +1149,7 @@ bool Compiler::CompileAnonymousSub( const ast::Sub& sub ) {
   uint32_t index;
   m_procedure = CompiledCodeBuilder(m_cc).CreateSubRoutine(sub,&index);
   {
-    LexicalScope scope(this,m_procedure,sub.body->location_end,true);
+    LexicalScope scope(this,m_procedure,sub.body->location_end,true,false,true);
     // Arguments
     for( size_t i = 0 ; i < sub.arg_list.size(); ++i ) {
       scope.DefineLocal(sub.arg_list[i]);
@@ -1180,7 +1175,7 @@ bool Compiler::Compile( const CompilationUnit::SubList& sub_list ) {
   m_procedure = CompiledCodeBuilder(m_cc).CreateSubRoutine(sub,&index);
 
   {
-    LexicalScope scope(this,m_procedure,sub.body->location_end,true);
+    LexicalScope scope(this,m_procedure,sub.body->location_end,true,false,true);
     // Generate argument list as local variables
     for( size_t i = 0 ; i < sub.arg_list.size() ; ++i ) {
       scope.DefineLocal( sub.arg_list[i] );
@@ -1344,7 +1339,10 @@ bool Compiler::Compile( const CompilationUnit& cu ) {
 
 bool Compiler::DoCompile() {
   m_procedure = m_cc->entry();
-  return Compile(m_unit);
+  {
+    LexicalScope scope(this,m_procedure);
+    return Compile(m_unit);
+  }
 }
 
 } // namespace

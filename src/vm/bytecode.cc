@@ -27,6 +27,13 @@ bool BytecodeHasOperand( Bytecode bc ) {
   return kOperandTable[static_cast<uint8_t>(bc)];
 }
 
+IntrinsicFunctionIndex GetIntrinsicFunctionIndex( const char* data ) {
+#define __(A,B,C,D) if(strcmp(B,data) ==0) return INTRINSIC_FUNCTION_##A;
+  INTRINSIC_FUNCTION_LIST(__)
+#undef __ // __
+  return INTRINSIC_FUNCTION_UNKNOWN;
+}
+
 void BytecodeBuffer::Serialize( std::ostream& output ) const {
   Iterator beg = Begin();
   Iterator end = End();

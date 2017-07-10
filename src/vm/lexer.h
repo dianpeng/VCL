@@ -50,6 +50,7 @@ namespace vm  {
   /* Punction */ \
   __(TK_SEMICOLON,";") \
   __(TK_COLON,":") \
+  __(TK_FIELD,"::") \
   __(TK_COMMA,",") \
   __(TK_DOT,".") \
   __(TK_LPAR,"(") \

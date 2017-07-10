@@ -157,7 +157,7 @@ const Lexeme& Lexer::LexCode() {
       case '>': return Lookahead(TK_GE,'=',TK_GT);
       case '&': return Lookahead(TK_AND,'&',TK_ERROR);
       case '|': return Lookahead(TK_OR,'|',TK_ERROR);
-      case ':': YIELD(TK_COLON,1);
+      case ':': return Lookahead(TK_FIELD,':',TK_COLON);
       case ';': YIELD(TK_SEMICOLON,1);
       case ',': YIELD(TK_COMMA,1);
       case '.': YIELD(TK_DOT,1);

@@ -141,6 +141,7 @@ class Parser {
     m_lexer(source,file_path),
     m_error(error),
     m_file(NULL),
+    m_lexical_scope(NULL),
     m_rand_name_seed(rand_name_ref),
     m_nested_loop(0),
     m_support_loop(support_loop)
@@ -156,11 +157,13 @@ class Parser {
  private:
   void ParserError( const char* format , ... );
   zone::ZoneString* GetAnonymousSubName( zone::Zone* ) const;
+  zone::ZoneString* GetTempVariableName( zone::Zone* ) const;
 
  private:
   bool IsPrefixOperator( Token tk ) {
     switch(tk) {
-      case TK_COLON: case TK_DOT: case TK_LSQR: case TK_LPAR:
+      case TK_COLON: case TK_DOT: case TK_LSQR:
+      case TK_LPAR : case TK_FIELD:
         return true;
       default:
         return false;
@@ -174,6 +177,7 @@ class Parser {
   ast::List* ParseList();
   ast::Prefix* ParsePrefix( zone::ZoneString* prefix , int* last_component = NULL );
   ast::FuncCall* ParseFuncCall();
+  ast::FuncCall* ParseMethodCall( ast::AST* );
   ast::FuncCall* ParseFuncCallArgument( ast::FuncCall* );
   ast::AST* ParseStringConcat();
   ast::AST* ParseAtomic();
@@ -233,20 +237,7 @@ class Parser {
   ast::AST* ParseStatementWithSemicolon();
   ast::AST* ParseStatement();
   ast::Chunk* ParseChunk();
-  ast::Chunk* ParseSingleStatementOrChunk() {
-    if(m_lexer.lexeme().token == TK_LBRA) {
-      return ParseChunk();
-    } else {
-      ast::Chunk* ret = new (m_zone) ast::Chunk(m_lexer.location());
-      ast::AST* code = ParseStatementWithSemicolon();
-      if(code) {
-        ret->statement_list.Add(m_zone,code);
-        return ret;
-      } else {
-        return NULL;
-      }
-    }
-  }
+  ast::Chunk* ParseSingleStatementOrChunk();
  private: // top level
   ast::AST* ParseInclude();
   ast::AST* ParseImport();
@@ -265,9 +256,13 @@ class Parser {
   Lexer m_lexer;
   std::string* m_error;
   ast::File* m_file;
+  ast::Chunk* m_lexical_scope;
   mutable int m_rand_name_seed;
   int m_nested_loop;      // how many level of loop we are in
   bool m_support_loop;    // whether we support loop as a valid grammar
+
+  class EnterLexicalScope;
+  friend class EnterLexicalScope;
 
  private: // For unittest
   FRIEND_TEST(Parser,Basic);

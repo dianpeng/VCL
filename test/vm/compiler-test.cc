@@ -381,6 +381,20 @@ TEST(Compiler,For) {
     );
 }
 
+TEST(Compiler,MethodCall) {
+  CC(vcl 4.0;
+     global a = a.b.c.d::f();
+    );
+
+  CC( vcl 4.0;
+      global xx = a.b.c.d::f(1,2,3,ggg);
+      sub foo {
+        declare a = 10;
+        return {a + xx};
+      }
+    );
+}
+
 
 } // namespace vm
 } // namespace vcl

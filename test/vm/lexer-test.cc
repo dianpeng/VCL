@@ -12,7 +12,7 @@ TEST(Lexer,Operators) {
   const std::string source = STRINGIFY(
       + - * / % ~ !~ == != < <= > >= =
       && || ! /= *= -= += %= ; , .
-      () [] {}
+      () [] {} : ::
       );
   const std::string file_name = "test";
   Token tokens[] = {
@@ -47,6 +47,8 @@ TEST(Lexer,Operators) {
     TK_RSQR,
     TK_LBRA,
     TK_RBRA,
+    TK_COLON,
+    TK_FIELD,
     TK_EOF
   };
   Lexer lexer(source,file_name);

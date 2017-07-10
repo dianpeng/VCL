@@ -417,6 +417,31 @@ TEST(Parser,ConstantFold) {
   positive( vcl 4.0; global a = 1 + 2 + g;);
 }
 
+
+TEST(Parser,MethodCall) {
+  // Global scope
+  positive(vcl 4.0;
+           global a = a.b.c.d::f();
+           global b = a.b.c.d();
+           global c = a.b.c.d.e:f();
+           global f = a.b.c.d.e::f(1,2,3,4);
+      );
+
+  positive(vcl 4.0;
+      global a = a::f();
+      global b = a::f(1);
+      global c = a.b[c]();
+      global d = a.b[c]:d.e."f"::j();
+      );
+  positive(vcl 4.0;
+      sub a {
+        declare a = a::b().c;
+        declare b = a.b.c.d::f(b);
+        declare c = a.dcc::b(c,d,e,f);
+      }
+      );
+}
+
 } // namespace vm
 } // namespace vcl
 
