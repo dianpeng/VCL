@@ -1149,7 +1149,9 @@ bool Compiler::CompileAnonymousSub( const ast::Sub& sub ) {
   uint32_t index;
   m_procedure = CompiledCodeBuilder(m_cc).CreateSubRoutine(sub,&index);
   {
+    // Setup a function lexical scope since it is a new function/subroutine
     LexicalScope scope(this,m_procedure,sub.body->location_end,true,false,true);
+
     // Arguments
     for( size_t i = 0 ; i < sub.arg_list.size(); ++i ) {
       scope.DefineLocal(sub.arg_list[i]);
@@ -1175,7 +1177,9 @@ bool Compiler::Compile( const CompilationUnit::SubList& sub_list ) {
   m_procedure = CompiledCodeBuilder(m_cc).CreateSubRoutine(sub,&index);
 
   {
+    // Setup a function lexical scope
     LexicalScope scope(this,m_procedure,sub.body->location_end,true,false,true);
+
     // Generate argument list as local variables
     for( size_t i = 0 ; i < sub.arg_list.size() ; ++i ) {
       scope.DefineLocal( sub.arg_list[i] );
