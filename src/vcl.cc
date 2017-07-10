@@ -27,7 +27,7 @@ MethodStatus Value::GetProperty( Context* context ,
   if(IsObject()) {
     return object()->GetProperty(context,key,output);
   } else {
-    return MethodStatus::NewUnimplemented("GetProperty not implement for type %s",
+    return MethodStatus::NewUnimplemented("Primitive type %s doesn't support \".\" operator!",
         type_name());
   }
 }
@@ -38,7 +38,7 @@ MethodStatus Value::SetProperty( Context* context ,
   if(IsObject()) {
     return object()->SetProperty(context,key,value);
   } else {
-    return MethodStatus::NewUnimplemented("SetProperty not implement for type %s",
+    return MethodStatus::NewUnimplemented("Primitive type %s doesn't support \".\" operator!",
         type_name());
   }
 }
@@ -49,7 +49,7 @@ MethodStatus Value::GetAttribute( Context* context ,
   if(IsObject()) {
     return object()->GetAttribute(context,key,output);
   } else {
-    return MethodStatus::NewUnimplemented("GetAttribute not implement for type %s",
+    return MethodStatus::NewUnimplemented("Primitive type %s doesn't support \":\" operator!",
         type_name());
   }
 }
@@ -60,7 +60,7 @@ MethodStatus Value::SetAttribute( Context* context ,
   if(IsObject()) {
     return object()->SetAttribute(context,key,value);
   } else {
-    return MethodStatus::NewUnimplemented("SetAttribute not implement for type %s",
+    return MethodStatus::NewUnimplemented("Primitive type %s doesn't support \":\" operator!",
         type_name());
   }
 }
@@ -70,7 +70,7 @@ MethodStatus Value::GetIndex( Context* context , const Value& index ,
   if(IsObject()) {
     return object()->GetIndex(context,index,output);
   } else {
-    return MethodStatus::NewUnimplemented("GetIndex not implement for type %s",
+    return MethodStatus::NewUnimplemented("Primitive type %s doesn't support \"[]\" operator!",
         type_name());
   }
 }
@@ -80,7 +80,7 @@ MethodStatus Value::SetIndex( Context* context , const Value& index ,
   if(IsObject()) {
     return object()->SetIndex(context,index,value);
   } else {
-    return MethodStatus::NewUnimplemented("SetIndex not implement for type %s",
+    return MethodStatus::NewUnimplemented("Primitive type %s doesn't support \"[]\" operator!",
         type_name());
   }
 }
@@ -89,7 +89,7 @@ MethodStatus Value::Invoke( Context* context , Value* output ) {
   if(IsObject()) {
     return object()->Invoke(context,output);
   } else {
-    return MethodStatus::NewUnimplemented("Invoke not implement for type %s",
+    return MethodStatus::NewUnimplemented("Primitive type %s doesn't support invoke as a function!",
         type_name());
   }
 }
@@ -343,18 +343,20 @@ MethodStatus Value::Match( Context* context , const Value& value ,
                            bool* output ) const {
   if(IsObject())
     return object()->Match(context,value,output);
-  else
-    return MethodStatus::NewUnimplemented("Match not implement for type %s",
+  else {
+    return MethodStatus::NewUnimplemented("Primitive type %s cannot work with \"~\" operator!",
         type_name());
+  }
 }
 
 MethodStatus Value::NotMatch( Context* context , const Value& value ,
     bool* output ) const {
   if(IsObject())
     return object()->NotMatch(context,value,output);
-  else
-    return MethodStatus::NewUnimplemented("NotMatch not implement for type %s",
+  else {
+    return MethodStatus::NewUnimplemented("Primitive type %s cannot work with \"!~\" operator!",
         type_name());
+  }
 }
 
 MethodStatus Value::Unset( Context* context ) {
@@ -793,8 +795,8 @@ MethodStatus Object::GetProperty( Context* context , const String& key ,
   VCL_UNUSED(context);
   VCL_UNUSED(key);
   VCL_UNUSED(output);
-  return MethodStatus::NewUnimplemented("GetProperty not implement for type %s",
-      type_name());
+  return MethodStatus::NewUnimplemented("GetProperty not implement for type %s"
+                                        "so cannot use \".\" operator!",type_name());
 }
 
 MethodStatus Object::SetProperty( Context* context , const String& key ,
@@ -802,8 +804,8 @@ MethodStatus Object::SetProperty( Context* context , const String& key ,
   VCL_UNUSED(context);
   VCL_UNUSED(key);
   VCL_UNUSED(output);
-  return MethodStatus::NewUnimplemented("SetProperty not implement for type %s",
-      type_name());
+  return MethodStatus::NewUnimplemented("SetProperty not implement for type %s,"
+                                        "so cannot use \".\" operator!",type_name());
 }
 
 MethodStatus Object::GetAttribute( Context* context , const String& key ,
@@ -811,8 +813,8 @@ MethodStatus Object::GetAttribute( Context* context , const String& key ,
   VCL_UNUSED(context);
   VCL_UNUSED(key);
   VCL_UNUSED(output);
-  return MethodStatus::NewUnimplemented("GetAttribute not implement for type %s",
-      type_name());
+  return MethodStatus::NewUnimplemented("GetAttribute not implement for type %s"
+                                        "so cannot use \":\" operator!",type_name());
 }
 
 MethodStatus Object::SetAttribute( Context* context , const String& key ,
@@ -820,8 +822,8 @@ MethodStatus Object::SetAttribute( Context* context , const String& key ,
   VCL_UNUSED(context);
   VCL_UNUSED(key);
   VCL_UNUSED(output);
-  return MethodStatus::NewUnimplemented("SetAttribute not implement for type %s",
-      type_name());
+  return MethodStatus::NewUnimplemented("SetAttribute not implement for type %s"
+                                        "so cannot use \":\" operator!",type_name());
 }
 
 MethodStatus Object::GetIndex( Context* context , const Value& index ,
@@ -829,8 +831,8 @@ MethodStatus Object::GetIndex( Context* context , const Value& index ,
   VCL_UNUSED(context);
   VCL_UNUSED(index);
   VCL_UNUSED(output);
-  return MethodStatus::NewUnimplemented("GetIndex not implement for type %s",
-      type_name());
+  return MethodStatus::NewUnimplemented("GetIndex not implement for type %s"
+                                        "so cannot use \"[]\" operator!",type_name());
 }
 
 MethodStatus Object::SetIndex( Context* context , const Value& index ,
@@ -838,47 +840,49 @@ MethodStatus Object::SetIndex( Context* context , const Value& index ,
   VCL_UNUSED(context);
   VCL_UNUSED(index);
   VCL_UNUSED(value);
-  return MethodStatus::NewUnimplemented("SetIndex not implement for type %s",
-      type_name());
+  return MethodStatus::NewUnimplemented("SetIndex not implement for type %s"
+                                        "so cannot use \"[]\" operator!",type_name());
 }
 
 MethodStatus Object::Invoke( Context* context , Value* output ) {
   VCL_UNUSED(context);
   VCL_UNUSED(output);
-  return MethodStatus::NewUnimplemented("Invoke not implement for type %s",
-      type_name());
+  return MethodStatus::NewUnimplemented("Invoke not implement for type %s"
+                                        "so cannot invoke as function!",type_name());
 }
 
-#define DO(NAME) \
+#define DO(NAME,OP) \
   MethodStatus Object::NAME( Context* context , const Value& value , \
       Value* output ) const { \
     VCL_UNUSED(context); \
     VCL_UNUSED(value); \
     VCL_UNUSED(output); \
-    return MethodStatus::NewUnimplemented( #NAME " not implement for type %s",type_name()); \
+    return MethodStatus::NewUnimplemented( #NAME " not implement for type %s," \
+                                                 "so no support for operator \"" #OP "\"!",type_name()); \
   }
 
-DO(Add)
-DO(Sub)
-DO(Mul)
-DO(Div)
-DO(Mod)
+DO(Add,+)
+DO(Sub,-)
+DO(Mul,*)
+DO(Div,/)
+DO(Mod,%)
 
 #undef DO // DO
 
 
-#define DO(NAME) \
+#define DO(NAME,OP) \
   MethodStatus Object::NAME( Context* context , const Value& output ) { \
     VCL_UNUSED(context); \
     VCL_UNUSED(output); \
-    return MethodStatus::NewUnimplemented( #NAME " not implement for type %s",type_name()); \
+    return MethodStatus::NewUnimplemented( #NAME " not implement for type %s," \
+                                                 "so no support for operator \"" #OP "\"!",type_name()); \
   }
 
-DO(SelfAdd)
-DO(SelfSub)
-DO(SelfMul)
-DO(SelfDiv)
-DO(SelfMod)
+DO(SelfAdd,+=)
+DO(SelfSub,-=)
+DO(SelfMul,*=)
+DO(SelfDiv,/=)
+DO(SelfMod,%=)
 
 #undef DO // DO
 
@@ -887,23 +891,25 @@ MethodStatus Object::Unset( Context* context ) {
   return MethodStatus::NewUnimplemented("Unset not implement for type %s",type_name());
 }
 
-#define DO(NAME) \
+#define DO(NAME,OP) \
   MethodStatus Object::NAME( Context* context , const Value& value , \
       bool* output ) const { \
     VCL_UNUSED(context); \
     VCL_UNUSED(value); \
     VCL_UNUSED(output); \
-    return MethodStatus::NewUnimplemented( #NAME " not implement for type %s",type_name()); \
+    return MethodStatus::NewUnimplemented( #NAME " not implement for type %s," \
+                                                 "so no support for operator \"" #OP "\"!",type_name()); \
   }
 
-DO(Less)
-DO(LessEqual)
-DO(Greater)
-DO(GreaterEqual)
+DO(Less,<)
+DO(LessEqual,<=)
+DO(Greater,>)
+DO(GreaterEqual,>=)
 
 #undef DO // DO
 
 MethodStatus Object::Equal( Context* context , const Value& rhs , bool* output ) const {
+  VCL_UNUSED(context);
   if(rhs.IsObject() && this == rhs.GetObject()) {
     *output = true;
   } else {
@@ -913,6 +919,7 @@ MethodStatus Object::Equal( Context* context , const Value& rhs , bool* output )
 }
 
 MethodStatus Object::NotEqual( Context* context , const Value& rhs , bool* output ) const {
+  VCL_UNUSED(context);
   if(rhs.IsObject() && this == rhs.GetObject()) {
     *output = false;
   } else {
@@ -926,7 +933,8 @@ MethodStatus Object::Match( Context* context , const Value& value ,
   VCL_UNUSED(context);
   VCL_UNUSED(value);
   VCL_UNUSED(output);
-  return MethodStatus::NewUnimplemented("Match not implement for type %s",type_name());
+  return MethodStatus::NewUnimplemented("Match not implement for type %s,"
+                                        "so no support for operator \"~\"!",type_name());
 }
 
 MethodStatus Object::NotMatch( Context* context , const Value& value ,
@@ -934,7 +942,8 @@ MethodStatus Object::NotMatch( Context* context , const Value& value ,
   VCL_UNUSED(context);
   VCL_UNUSED(value);
   VCL_UNUSED(output);
-  return MethodStatus::NewUnimplemented("NotMatch not implement for type %s",type_name());
+  return MethodStatus::NewUnimplemented("NotMatch not implement for type %s,"
+                                        "so no support for operator \"!~\"!",type_name());
 }
 
 MethodStatus Object::ToString( Context* context , std::string* output ) const {
@@ -973,8 +982,8 @@ MethodStatus Object::ToDisplay( Context* context , std::ostream* output ) const 
 MethodStatus Object::NewIterator( Context* context , Iterator** output ) {
   VCL_UNUSED(context);
   VCL_UNUSED(output);
-  return MethodStatus::NewUnimplemented("NewIterator not implemented for type %s",
-      type_name());
+  return MethodStatus::NewUnimplemented("NewIterator not implemented for type %s,",
+                                        "so no support for working with loop!",type_name());
 }
 
 Object::~Object(){}

@@ -497,6 +497,11 @@ class Value VCL_FINAL {
   bool IsObject() const {
     return m_type > TYPE_DURATION;
   }
+
+  bool IsPrimitive() const {
+    return !IsObject();
+  }
+
   Object* GetObject() const {
     CHECK(IsObject());
     return object();
