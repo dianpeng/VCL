@@ -1,15 +1,15 @@
 #ifndef PARSER_H_
 #define PARSER_H_
-#include <string>
 #include <gtest/gtest_prod.h>
+#include <string>
 #include "ast.h"
 
 namespace vcl {
 class Engine;
-namespace vm  {
+namespace vm {
 
 namespace test {
-bool _test( const char* );
+bool _test(const char*);
 }
 
 // Here is a simple BNF for VCL grammar. The formal definition of
@@ -87,12 +87,14 @@ bool _test( const char* );
 // single-statement-or-chunk ::= statement SEMICOLON | chunk
 // else-list ::= (ELIF|ELSIF|ELSEIF) '(' expr ')' single-statement-or-chunk.
 // else ::= ELSE single-statement-or-chunk.
-// left-hand-side ::= VARNAME ( DOT VARNAME |'[' expr ']'|arglist )* ( DOT VARNAME | '[' expr ']' ).
+// left-hand-side ::= VARNAME ( DOT VARNAME |'[' expr ']'|arglist )* ( DOT
+// VARNAME | '[' expr ']' ).
 // right-hand-side ::= expr.
 //
 // for ::= 'for' '(' VARNAME (for-each-rest | for-rest)
 // for-each-rest ::= ':' expression ')' single-statement-or-chunk
-// for-rest      ::= ASSIGN expressino ';' expression ';' expression ';' ')' single-statement-or-chunk
+// for-rest      ::= ASSIGN expressino ';' expression ';' expression ';' ')'
+// single-statement-or-chunk
 //
 // 3. Expression
 //
@@ -126,26 +128,21 @@ bool _test( const char* );
 // class which already contains all the important APIs that allow user to do
 // high level compilation.
 
-
 class Parser {
  public:
-  Parser( zone::Zone* zone ,
-          const std::string& file_path ,
-          const std::string& source    ,
-          std::string* error ,
-          int rand_name_ref = 0 ,
-          bool support_loop = true ):
-    m_zone(zone),
-    m_file_path(file_path),
-    m_source(source),
-    m_lexer(source,file_path),
-    m_error(error),
-    m_file(NULL),
-    m_lexical_scope(NULL),
-    m_rand_name_seed(rand_name_ref),
-    m_nested_loop(0),
-    m_support_loop(support_loop)
-  {}
+  Parser(zone::Zone* zone, const std::string& file_path,
+         const std::string& source, std::string* error, int rand_name_ref = 0,
+         bool support_loop = true)
+      : m_zone(zone),
+        m_file_path(file_path),
+        m_source(source),
+        m_lexer(source, file_path),
+        m_error(error),
+        m_file(NULL),
+        m_lexical_scope(NULL),
+        m_rand_name_seed(rand_name_ref),
+        m_nested_loop(0),
+        m_support_loop(support_loop) {}
 
   // The main function for parsing the target file and soruce
   ast::File* DoParse();
@@ -155,15 +152,18 @@ class Parser {
   int rand_name_seed() const { return m_rand_name_seed; }
 
  private:
-  void ParserError( const char* format , ... );
-  zone::ZoneString* GetAnonymousSubName( zone::Zone* ) const;
-  zone::ZoneString* GetTempVariableName( zone::Zone* ) const;
+  void ParserError(const char* format, ...);
+  zone::ZoneString* GetAnonymousSubName(zone::Zone*) const;
+  zone::ZoneString* GetTempVariableName(zone::Zone*) const;
 
  private:
-  bool IsPrefixOperator( Token tk ) {
-    switch(tk) {
-      case TK_COLON: case TK_DOT: case TK_LSQR:
-      case TK_LPAR : case TK_FIELD:
+  bool IsPrefixOperator(Token tk) {
+    switch (tk) {
+      case TK_COLON:
+      case TK_DOT:
+      case TK_LSQR:
+      case TK_LPAR:
+      case TK_FIELD:
         return true;
       default:
         return false;
@@ -172,26 +172,27 @@ class Parser {
 
   bool is_in_loop() const { return m_nested_loop > 0; }
 
- private: // Expression
+ private:  // Expression
   ast::AST* ParsePrimary();
   ast::List* ParseList();
-  ast::Prefix* ParsePrefix( zone::ZoneString* prefix , int* last_component = NULL );
+  ast::Prefix* ParsePrefix(zone::ZoneString* prefix,
+                           int* last_component = NULL);
   ast::FuncCall* ParseFuncCall();
-  ast::FuncCall* ParseMethodCall( ast::AST* );
-  ast::FuncCall* ParseFuncCallArgument( ast::FuncCall* );
+  ast::FuncCall* ParseMethodCall(ast::AST*);
+  ast::FuncCall* ParseFuncCallArgument(ast::FuncCall*);
   ast::AST* ParseStringConcat();
   ast::AST* ParseAtomic();
   ast::ExtensionInitializer* ParseExtensionInitializer();
-  ast::ExtensionLiteral* ParseExtensionLiteral( zone::ZoneString* );
-  ast::Dict*ParseDict();
+  ast::ExtensionLiteral* ParseExtensionLiteral(zone::ZoneString*);
+  ast::Dict* ParseDict();
   ast::AST* ParseUnary();
-  ast::AST* ParseBinaryPrecedence( int precedence );
+  ast::AST* ParseBinaryPrecedence(int precedence);
   ast::AST* ParseBinary();
   ast::AST* ParseTernary();
   ast::AST* ParseExpression();
   ast::AST* ParseStringInterpolation();
 
- private: // Statement
+ private:  // Statement
   ast::AST* ParseReturnOrTerminate();
   ast::AST* ParseReturn();
   ast::AST* ParseTerminate();
@@ -200,10 +201,10 @@ class Parser {
   // Call a certain function with prefix or not , it should end up with
   // a function call regardless of what
   ast::AST* ParsePrefixCall();
-  bool ParseLHS( ast::LeftHandSide* output );
+  bool ParseLHS(ast::LeftHandSide* output);
   ast::AST* ParseSet();
   ast::AST* ParseUnset();
-  template< int TK >
+  template <int TK>
   ast::AST* ParseDeclareImpl();
   ast::AST* ParseDeclare() {
     CHECK(m_lexer.lexeme().token == TK_DECLARE);
@@ -216,16 +217,17 @@ class Parser {
     return ParseDeclareImpl<TK_NEW>();
   }
   ast::AST* ParseIf();
-  bool ParseBranch( ast::If::Branch* );
+  bool ParseBranch(ast::If::Branch*);
 
   // loop
   ast::AST* ParseFor();
 
-  template< typename T >
+  template <typename T>
   ast::AST* ParseLoopControlStmt() {
-    if(!is_in_loop()) {
-      ParserError("\"break\" or \"continue\" statement can only write inside "
-                  "a loop body");
+    if (!is_in_loop()) {
+      ParserError(
+          "\"break\" or \"continue\" statement can only write inside "
+          "a loop body");
       return NULL;
     }
     T* ret = new (m_zone) T(m_lexer.location());
@@ -238,12 +240,13 @@ class Parser {
   ast::AST* ParseStatement();
   ast::Chunk* ParseChunk();
   ast::Chunk* ParseSingleStatementOrChunk();
- private: // top level
+
+ private:  // top level
   ast::AST* ParseInclude();
   ast::AST* ParseImport();
   ast::AST* ParseAnonymousSub();
   ast::AST* ParseSub();
-  ast::AST* ParseSubDefinition( zone::ZoneString* );
+  ast::AST* ParseSubDefinition(zone::ZoneString*);
   ast::AST* ParseExtension();
   ast::AST* ParseACL();
   bool ParseVCLVersion();
@@ -258,21 +261,21 @@ class Parser {
   ast::File* m_file;
   ast::Chunk* m_lexical_scope;
   mutable int m_rand_name_seed;
-  int m_nested_loop;      // how many level of loop we are in
-  bool m_support_loop;    // whether we support loop as a valid grammar
+  int m_nested_loop;    // how many level of loop we are in
+  bool m_support_loop;  // whether we support loop as a valid grammar
 
   class EnterLexicalScope;
   friend class EnterLexicalScope;
 
- private: // For unittest
-  FRIEND_TEST(Parser,Basic);
-  FRIEND_TEST(Parser,Expression);
-  FRIEND_TEST(Parser,Statement);
-  FRIEND_TEST(Parser,File);
+ private:  // For unittest
+  FRIEND_TEST(Parser, Basic);
+  FRIEND_TEST(Parser, Expression);
+  FRIEND_TEST(Parser, Statement);
+  FRIEND_TEST(Parser, File);
   friend bool test::_test(const char*);
 };
 
-} // namespace vm
-} // namespace vcl
+}  // namespace vm
+}  // namespace vcl
 
-#endif // PARSER_H_
+#endif  // PARSER_H_

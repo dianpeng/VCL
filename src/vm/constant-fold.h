@@ -3,19 +3,19 @@
 #include <string>
 
 namespace vcl {
-namespace vm  {
+namespace vm {
 
 namespace ast {
 struct AST;
-} // namespace ast
+}  // namespace ast
 
 namespace zone {
 class Zone;
-} // namespace zone
+}  // namespace zone
 
-ast::AST* ConstantFold( ast::AST* , zone::Zone* , std::string* error );
+ast::AST* ConstantFold(ast::AST*, zone::Zone*, std::string* error);
 
-} // namespace vm
-} // namespace vcl
+}  // namespace vm
+}  // namespace vcl
 
-#endif // CONSTANT_FOLD_H_
+#endif  // CONSTANT_FOLD_H_

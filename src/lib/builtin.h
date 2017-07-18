@@ -6,8 +6,8 @@ namespace vcl {
 class Engine;
 class Context;
 
-void AddBuiltin( Engine* );
+void AddBuiltin(Engine*);
 
-} // namespace vcl
+}  // namespace vcl
 
-#endif // BUILTIN_H_
+#endif  // BUILTIN_H_

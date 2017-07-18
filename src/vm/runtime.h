@@ -17,14 +17,14 @@ namespace detail {
 
 class VMGuard {
  public:
-  inline VMGuard( Runtime* runtime );
+  inline VMGuard(Runtime* runtime);
   inline ~VMGuard();
+
  private:
   Runtime* m_runtime;
 };
 
-} // namespace detail
-
+}  // namespace detail
 
 // A runtime in VCL represents the virtual machine instance plus all runtime
 // variable related to the execution. The main virtual machine entry is in the
@@ -32,8 +32,10 @@ class VMGuard {
 // We have a typical stack based virtual machine, the memory layout is very
 // simple since no loop involved , no need to optimize for performance. The
 // frame for function call are stored seperately in an vector ; and the value
-// stack is just a stack of Value objects. The Frame structure records everything
-// and is able to resume or suspend a certain function execution on demand, which
+// stack is just a stack of Value objects. The Frame structure records
+// everything
+// and is able to resume or suspend a certain function execution on demand,
+// which
 // is part of our design.
 class Runtime {
   // Default value stack initialized size
@@ -61,53 +63,45 @@ class Runtime {
     // Instruction count
     int64_t instr_count;
 
-    bool IsCppFunction() const {
-      return caller.IsFunction();
-    }
+    bool IsCppFunction() const { return caller.IsFunction(); }
 
-    bool IsScriptFunction() const {
-      return caller.IsSubRoutine();
-    }
+    bool IsScriptFunction() const { return caller.IsSubRoutine(); }
 
-    Function* function() const {
-      return caller.GetFunction();
-    }
+    Function* function() const { return caller.GetFunction(); }
 
-    SubRoutine* sub_routine() const {
-      return caller.GetSubRoutine();
-    }
+    SubRoutine* sub_routine() const { return caller.GetSubRoutine(); }
 
-    Frame( size_t b , size_t sz , const Value& c ):
-      base(b),
-      arg_size(sz),
-      pc(0),
-      caller(c),
-      source_index(0),
-      instr_count (0)
-    {}
+    Frame(size_t b, size_t sz, const Value& c)
+        : base(b),
+          arg_size(sz),
+          pc(0),
+          caller(c),
+          source_index(0),
+          instr_count(0) {}
 
     // For GC purpose
     void Mark() { caller.Mark(); }
   };
 
  public:
-  Runtime( Context* context , int max_calling_stack_size ):
-    m_context(context),
-    m_max_calling_stack_size(max_calling_stack_size),
-    m_frame(),
-    m_stack(),
-    m_v0(),
-    m_v1(),
-    m_yield(false),
-    m_vm_running(false)
-  { m_stack.reserve( kDefaultValueStackSize ); }
+  Runtime(Context* context, int max_calling_stack_size)
+      : m_context(context),
+        m_max_calling_stack_size(max_calling_stack_size),
+        m_frame(),
+        m_stack(),
+        m_v0(),
+        m_v1(),
+        m_yield(false),
+        m_vm_running(false) {
+    m_stack.reserve(kDefaultValueStackSize);
+  }
 
- public: // This a stateful APIs which is sololy used by Context object.
-         // In most case you should not use the following APIs since it
-         // is not safe at all
-  MethodStatus BeginRun( SubRoutine* );
-  void AddArgument( const Value& );
-  MethodStatus FinishRun( SubRoutine* , Value* );
+ public:  // This a stateful APIs which is sololy used by Context object.
+          // In most case you should not use the following APIs since it
+          // is not safe at all
+  MethodStatus BeginRun(SubRoutine*);
+  void AddArgument(const Value&);
+  MethodStatus FinishRun(SubRoutine*, Value*);
 
   // For getting the information about the function call and its argument
   size_t GetArgumentSize() const {
@@ -115,25 +109,25 @@ class Runtime {
     DCHECK(frame);
     return frame->arg_size;
   }
-  Value GetArgument( size_t index ) const {
+  Value GetArgument(size_t index) const {
     size_t arg_size = GetArgumentSize();
-    DCHECK( index < arg_size );
-    DCHECK( !m_frame.empty() );
-    return Back(CurrentFrame()->base,index);
+    DCHECK(index < arg_size);
+    DCHECK(!m_frame.empty());
+    return Back(CurrentFrame()->base, index);
   }
 
  public:
   bool Yield() {
-    if(m_vm_running) {
+    if (m_vm_running) {
       m_yield = true;
       return true;
     }
     return false;
   }
   bool is_yield() const { return m_yield; }
-  MethodStatus Resume( Value* );
+  MethodStatus Resume(Value*);
 
- public: // GC stuff
+ public:  // GC stuff
   void Mark();
 
   Context* context() const { return m_context; }
@@ -142,82 +136,83 @@ class Runtime {
 
  private:
   // Unwind the current calling stack
-  void UnwindStack( std::ostringstream* ) const;
+  void UnwindStack(std::ostringstream*) const;
 
-  MethodStatus ReportError( const std::string& ) const;
+  MethodStatus ReportError(const std::string&) const;
 
   const Frame* CurrentFrame() const { return &m_frame.back(); }
   Frame* CurrentFrame() { return &m_frame.back(); }
 
   // Helper functions
-  void Push( const Value& value ) { m_stack.push_back(value); }
-  void Pop ( size_t count ) {
-    DCHECK( count <= m_stack.size() );
-    m_stack.resize( m_stack.size() - count );
+  void Push(const Value& value) { m_stack.push_back(value); }
+  void Pop(size_t count) {
+    DCHECK(count <= m_stack.size());
+    m_stack.resize(m_stack.size() - count);
   }
-  void Replace( const Value& value ) { m_stack.back() = value; }
-  Value& Back( size_t base , size_t index ) {
-    DCHECK( index + base < m_stack.size() );
+  void Replace(const Value& value) { m_stack.back() = value; }
+  Value& Back(size_t base, size_t index) {
+    DCHECK(index + base < m_stack.size());
     return m_stack[index + base];
   }
-  Value& Top( size_t index ) {
-    DCHECK( index < m_stack.size() );
+  Value& Top(size_t index) {
+    DCHECK(index < m_stack.size());
     const size_t idx = (m_stack.size() - index - 1);
     return m_stack[idx];
   }
-  const Value& Back( size_t base , size_t index ) const {
-    DCHECK( index + base < m_stack.size() );
+  const Value& Back(size_t base, size_t index) const {
+    DCHECK(index + base < m_stack.size());
     return m_stack[index + base];
   }
-  const Value& Top( size_t index ) const {
-    DCHECK( index < m_stack.size() );
+  const Value& Top(size_t index) const {
+    DCHECK(index < m_stack.size());
     const size_t idx = (m_stack.size() - index - 1);
     return m_stack[idx];
   }
 
   // Helper class for resolving those dependencies
-  ExtensionFactory* GetExtensionFactory( const String& name ) const {
+  ExtensionFactory* GetExtensionFactory(const String& name) const {
     ExtensionFactory* factory = context()->GetExtensionFactory(name);
-    if(!factory) {
+    if (!factory) {
       factory = engine()->GetExtensionFactory(name);
     }
     return factory;
   }
 
-  Module* GetModule( const String& name ) const {
+  Module* GetModule(const String& name) const {
     Module* module = context()->GetModule(name);
-    if(!module) {
+    if (!module) {
       module = engine()->GetModule(name);
     }
     return module;
   }
 
-  bool GetGlobalVariable( const String& name , Value* output ) const {
-    if(!context()->GetGlobalVariable(name,output))
-      return engine()->GetGlobalVariable(name,output);
+  bool GetGlobalVariable(const String& name, Value* output) const {
+    if (!context()->GetGlobalVariable(name, output))
+      return engine()->GetGlobalVariable(name, output);
     return true;
   }
 
   // Calling stack manipulation
-  enum {
-    FUNC_SCRIPT,
-    FUNC_CPP,
-    FUNC_FAILED
-  };
+  enum { FUNC_SCRIPT, FUNC_CPP, FUNC_FAILED };
 
-  int EnterFunction( const Value& , size_t , MethodStatus* status );
+  int EnterFunction(const Value&, size_t, MethodStatus* status);
 
   // Return true means continue interpreting, otherwise we are exit
   // from the outermost function, so should really exit from the current
   // frame
-  bool ExitFunction( const Value& );
+  bool ExitFunction(const Value&);
 
   // Reset the internal status of VM , this can only be called internally
-  void Reset() { m_frame.clear(); m_stack.clear(); m_v0.SetNull(); }
+  void Reset() {
+    m_frame.clear();
+    m_stack.clear();
+    m_v0.SetNull();
+  }
 
  private:
   // virtual machine entry
-  MethodStatus Main( Value* , int64_t count = std::numeric_limits<int64_t>::max() );
+  MethodStatus Main(Value*,
+                    int64_t count = std::numeric_limits<int64_t>::max());
 
   // Context that is belonged to this Runtime object
   Context* m_context;
@@ -249,16 +244,14 @@ class Runtime {
 
 namespace detail {
 
-inline VMGuard::VMGuard( Runtime* runtime ):
-  m_runtime(runtime)
-{ runtime->m_vm_running = true; }
+inline VMGuard::VMGuard(Runtime* runtime) : m_runtime(runtime) {
+  runtime->m_vm_running = true;
+}
 
-inline VMGuard::~VMGuard()
-{ m_runtime->m_vm_running = false; }
+inline VMGuard::~VMGuard() { m_runtime->m_vm_running = false; }
 
-} // namespace detail
-} // namespace vm
-} // namespace vcl
+}  // namespace detail
+}  // namespace vm
+}  // namespace vcl
 
-
-#endif // RUNTIME_H_
+#endif  // RUNTIME_H_

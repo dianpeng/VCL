@@ -1,20 +1,20 @@
 #ifndef VCL_PRI_H_
 #define VCL_PRI_H_
-#include <boost/ptr_container/ptr_map.hpp>
-#include <boost/weak_ptr.hpp>
-#include <boost/shared_ptr.hpp>
 #include <vcl/vcl.h>
+#include <boost/ptr_container/ptr_map.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 
-#include "zone.h"
 #include "ast.h"
+#include "zone.h"
 
 namespace vcl {
 class CompiledCode;
 namespace vm {
-namespace ast{
+namespace ast {
 struct Sub;
-} // namespace ast
-} // namespace vm
+}  // namespace ast
+}  // namespace vm
 
 extern const std::string kEntryProcName;
 extern const std::string kEntryProcProtocol;
@@ -34,45 +34,40 @@ struct SourceCode {
   boost::shared_ptr<SourceCodeInfo> source_code_info;
   vm::ast::File* root;
 
-  SourceCode():
-    source_code_info( new SourceCodeInfo() ),
-    root       (NULL)
-  {}
+  SourceCode() : source_code_info(new SourceCodeInfo()), root(NULL) {}
 };
 
 // For unittest purpose
 struct LoadFileInterface {
-  virtual bool LoadFile( const std::string& path ,
-                         std::string* content ) = 0;
+  virtual bool LoadFile(const std::string& path, std::string* content) = 0;
   virtual ~LoadFileInterface() {}
 };
 
 class SourceRepo {
-  typedef boost::ptr_map<std::string,SourceCode> SourceCodeTable;
+  typedef boost::ptr_map<std::string, SourceCode> SourceCodeTable;
+
  public:
-  SourceRepo( LoadFileInterface* interface = NULL , bool allow_loop = true ):
-    m_source_code_table(),
-    m_entry(NULL),
-    m_interface(interface),
-    m_zone(),
-    m_rand_name_seed(0),
-    m_allow_loop    (allow_loop)
-  {}
+  SourceRepo(LoadFileInterface* interface = NULL, bool allow_loop = true)
+      : m_source_code_table(),
+        m_entry(NULL),
+        m_interface(interface),
+        m_zone(),
+        m_rand_name_seed(0),
+        m_allow_loop(allow_loop) {}
 
   ~SourceRepo() { delete m_interface; }
 
  public:
-  bool Initialize( const std::string& source_filename ,
-                   const std::string& source_code ,
-                   std::string* error );
+  bool Initialize(const std::string& source_filename,
+                  const std::string& source_code, std::string* error);
 
   SourceCode* GetEntry() {
     DCHECK(m_entry);
     return m_entry;
   }
 
-  SourceCode* FindOrLoadSourceCode( const std::string& file_path ,
-      std::string* error );
+  SourceCode* FindOrLoadSourceCode(const std::string& file_path,
+                                   std::string* error);
 
   vm::zone::Zone* zone() { return &m_zone; }
 
@@ -81,30 +76,27 @@ class SourceRepo {
   SourceCode* m_entry;
   LoadFileInterface* m_interface;
   vm::zone::Zone m_zone;
-  int m_rand_name_seed; // Used for parser to generate random name for
-                        // anonymous sub/function names
-  bool m_allow_loop;    // Whether we allow loop
+  int m_rand_name_seed;  // Used for parser to generate random name for
+                         // anonymous sub/function names
+  bool m_allow_loop;     // Whether we allow loop
 
   VCL_DISALLOW_COPY_AND_ASSIGN(SourceRepo);
 };
 
-
 class CompiledCodeBuilder {
  public:
-  CompiledCodeBuilder( CompiledCode* cc ):
-    m_cc(cc)
-  {}
+  CompiledCodeBuilder(CompiledCode* cc) : m_cc(cc) {}
 
  public:
   // Create a new SubRoutine and push it back to
-  vm::Procedure* CreateSubRoutine( const vm::ast::Sub& , uint32_t* index );
+  vm::Procedure* CreateSubRoutine(const vm::ast::Sub&, uint32_t* index);
 
   // Get the SubRoutine index from this CompiledCode object
-  int GetSubRoutineIndex( vm::zone::ZoneString* ) const;
+  int GetSubRoutineIndex(vm::zone::ZoneString*) const;
 
   // Index a specific SubRoutine
-  vm::Procedure* IndexSubRoutine( uint32_t index ) const {
-    if(index < m_cc->m_sub_routine_list.size())
+  vm::Procedure* IndexSubRoutine(uint32_t index) const {
+    if (index < m_cc->m_sub_routine_list.size())
       return &(m_cc->m_sub_routine_list[index]);
     else
       return NULL;
@@ -124,31 +116,27 @@ class CompiledCodeBuilder {
 // GC to provide convinient function for creating internal GC object.
 class InternalAllocator {
  public:
-  InternalAllocator( GC* gc ):
-    m_gc(gc)
-  {}
+  InternalAllocator(GC* gc) : m_gc(gc) {}
 
-  SubRoutine* NewSubRoutine( vm::Procedure* procedure ) {
+  SubRoutine* NewSubRoutine(vm::Procedure* procedure) {
     return m_gc->New<SubRoutine>(procedure);
   }
 
   vm::Procedure* NewEntryProcedure();
 
-  ACL* NewACL( vm::IPPattern* pattern ) {
-    return m_gc->New<ACL>(pattern);
-  }
+  ACL* NewACL(vm::IPPattern* pattern) { return m_gc->New<ACL>(pattern); }
+
  private:
   GC* m_gc;
 };
 
-
 // Private APIS ------------------------------------------------------
 // Translate an action string into builtin action index. If the string
 // cannot be translated , it will return type as ACT_EXTENSION.
-ActionType GetActionNameEnum( const char* );
+ActionType GetActionNameEnum(const char*);
 
-const char* GetActionName( ActionType );
+const char* GetActionName(ActionType);
 
-} // namespace vcl
+}  // namespace vcl
 
-#endif // VCL_PRI_H_
+#endif  // VCL_PRI_H_
