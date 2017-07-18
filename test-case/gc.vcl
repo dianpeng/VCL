@@ -5,14 +5,12 @@ vcl 4.0;
  *
  * We just try to create some very heavy GC workload to see whether our GC
  * trigger works well or not. For a simple stop-the-world GC, a good GC trigger
- * is very critical
- */
+ * is very critical */
 
-
-sub lots_of_gc_trigger {
+sub lots_of_gc_trigger(size) {
   declare start = time.now_in_micro_seconds();
 
-  for ( _  : loop( 1 , 1000000 , 1 ) ) {
+  for ( _  : loop( 1 , size , 1 ) ) {
     new l = {};
     new r = "string";
     new g = [];
@@ -36,12 +34,12 @@ sub lots_of_gc_trigger {
   println('GC ratio       : ${gc.gc_ratio()}');
 }
 
-sub lots_of_gc_miss {
+sub lots_of_gc_miss(size) {
   declare collector = [[]];
   declare index = 0;
   declare start = time.now_in_micro_seconds();
 
-  for ( _  : loop( 1 , 1000000 , 1 ) ) {
+  for ( _  : loop( 1 , size , 1 ) ) {
     new l = {};
     new r = "string";
     new g = [];
@@ -78,6 +76,9 @@ sub lots_of_gc_miss {
   println('GC trigger     : ${gc.gc_trigger()}');
   println('GC ratio       : ${gc.gc_ratio()}');
 
+  println("Do GC verification");
+
+  set start = time.now_in_micro_seconds();
   for( index , value : collector ) {
     new end = list.size(value) / 4;
     for( i : loop( 1 , end ) ) {
@@ -87,14 +88,20 @@ sub lots_of_gc_miss {
       assert( type(value[i*4+3]()) == "null" );
     }
   }
+  set end = time.now_in_micro_seconds();
+  println('Time : ${ end - start }');
 }
 
-sub test {
-  lots_of_gc_trigger;
-  lots_of_gc_miss;
+sub do_gc_collect {
   gc.force_collect();
   println('GC running time: ${gc.gc_times()}');
   println('GC size        : ${gc.gc_size()} ');
   println('GC trigger     : ${gc.gc_trigger()}');
   println('GC ratio       : ${gc.gc_ratio()}');
+}
+
+sub test {
+  lots_of_gc_trigger(1000000);
+  lots_of_gc_miss   (100000);
+  do_gc_collect;
 }
