@@ -67,6 +67,33 @@ class Runtime;
 } // namespace vm
 
 
+// User defined Malloc and Free hook for context GC object. User could use it
+// to do throttling in terms of memory or prevent context using too much memory.
+//
+// In general VCL doesn't assume memory allocation will fail , so a NULL returns
+// back to VCL means *crash* . Sometimes this is desired behavior, sometims this
+// is not.
+//
+// For some cases , user may be want to jump back to C++ code to do some clean up
+// or kill this context without crashing. So user can set up this hook to perform
+// jump back. This typically means user needs to throw an exception from the hook
+// function and then catch it in the outer most code.
+//
+// Like:
+//  throw bad_alloc(OOM);
+//
+// Then the outer most code catch this exception to know this context is using too
+// much memory and then kill this context.
+
+class AllocatorHook {
+ public:
+  virtual void* Malloc( Context* , size_t ) = 0;
+  virtual void  Free  ( Context* , void* ptr ) = 0;
+  virtual ~AllocatorHook() {}
+};
+
+
+
 
 // Source code information structure, record the file path and content
 // of the file for a specific source file
@@ -2044,7 +2071,8 @@ class ContextGC VCL_FINAL : public GC {
   ContextGC( size_t trigger , double ratio , Context* ctx ):
     GC(trigger,ratio),
     m_root_list(),
-    m_context(ctx)
+    m_context(ctx),
+    m_hook   ()
   {}
 
   virtual ~ContextGC() {}
@@ -2124,6 +2152,34 @@ class ContextGC VCL_FINAL : public GC {
       m_root_list.erase(iterator);
   }
 
+ public: // GC Hook for memory sandbox
+
+  void SetAllocatorHook( AllocatorHook* hook ) {
+    m_hook.reset(hook);
+  }
+
+  AllocatorHook* GetAllocatorHook() const {
+    return m_hook.get();
+  }
+
+ private:
+
+  virtual void* Malloc( size_t length ) {
+    if(m_hook) {
+      return m_hook->Malloc(m_context,length);
+    } else {
+      return GC::Malloc(length);
+    }
+  }
+
+  virtual void Free( void* ptr ) {
+    if(m_hook) {
+      return m_hook->Free(m_context,ptr);
+    } else {
+      return GC::Free(ptr);
+    }
+  }
+
  private:
   inline String* NewStringImpl( const char* str );
 
@@ -2131,6 +2187,7 @@ class ContextGC VCL_FINAL : public GC {
   virtual void Mark();
   RootNodeList m_root_list;
   Context* m_context;
+  boost::scoped_ptr<AllocatorHook> m_hook;
 
   friend class Context;
   VCL_DISALLOW_COPY_AND_ASSIGN(ContextGC);
@@ -2471,16 +2528,23 @@ class Engine VCL_FINAL : public detail::Environment<Engine,ImmutableGC> {
   VCL_DISALLOW_COPY_AND_ASSIGN(Engine);
 };
 
+
+
 // =========================================================================
 // Initialization APIs
 // Call this API before using any VCL library classes or APIs
 // =========================================================================
 void InitVCL( const char* process_path , double vcl_version_tag = 4.0 );
 
+
+
+
 // Check VCL Version is correct or not. Use InitVCL to setup VCL version.
 // This version is really useless right now since we just do a simple
 // equal check and we don't support multiple version in current implementation.
 bool CheckVCLVersion( double version );
+
+
 
 // =========================================================================
 // Inline APIs definition
