@@ -14,6 +14,9 @@ LIBRARYLIB=-lglog -lpcre -lpthread -lboost_system
 # Library flags
 LIBRARYFLAG=-Isrc/ -g3 -O3 -Iinclude/ -Wall -fsanitize=address
 
+# Production flags
+PRODUCTIONFLAG=-Isrc -g3 -Iinclude/ -Wall -DNDEBUG -fsanitize=address
+
 # Files
 SOURCE:=$(shell find src/ -type f -name "*.cc")
 INCLUDE:=$(shell find include/ -type f -name "*.h")
@@ -70,7 +73,7 @@ compilation-unit-test: $(SOURCE) $(INCLUDE) test/vm/compilation-unit-test.cc
 	$(CXX) $(TESTFLAG) $(SOURCE) test/vm/compilation-unit-test.cc $(TESTLIB) -o compilation-test
 
 driver: $(SOURCE) $(INCLUDE) test/vm/driver.cc
-	$(CXX) $(TESTFLAG) $(SOURCE) test/vm/driver.cc $(TESTLIB) -o driver
+	$(CXX) $(PRODUCTIONFLAG) $(SOURCE) test/vm/driver.cc $(TESTLIB) -o driver
 
 
 test/%.t : test/%.cc

@@ -1805,7 +1805,7 @@ class GC {
 #ifdef VCL_MINIMUM_GC_GAP
     VCL_MINIMUM_GC_GAP
 #else
-    500
+    5000
 #endif // VCL_MINIMUM_GC_GAP
     ;
 
@@ -1817,7 +1817,10 @@ class GC {
     m_gc_ratio(gc_ratio),
     m_minimum_gc_gap( minimum_gc_gap ),
     m_gc_times(0)
-  { DCHECK( gc_ratio >= 0.0 && gc_ratio <= 1.0 ); }
+  {
+    DCHECK( gc_ratio >= 0.0 && gc_ratio <= 1.0 );
+    m_next_gc = m_next_gc < minimum_gc_gap ? minimum_gc_gap : m_next_gc ;
+  }
 
   // Try to do the GC collection based on the internal trigger mechanism
   // if a GC process is triggered , it returns true ; otherwise returns false
@@ -1986,14 +1989,15 @@ class GC {
   void Recalculate( size_t collected ) {
     if( m_gc_size ) {
       // This much has been collecte
-      double ratio = static_cast<double>( collected / m_gc_size );
+      double ratio = static_cast<double>(collected) /
+                     static_cast<double>(m_gc_size);
 
       double left = m_gc_ratio - ratio;
 
       // Next GC trigger time size
       int64_t next_gc = static_cast<int64_t>(m_next_gc);
 
-      next_gc += next_gc * left;
+      next_gc = next_gc * (1.0 + left);
 
       m_next_gc = static_cast<size_t>(next_gc);
 

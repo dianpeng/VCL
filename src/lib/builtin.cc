@@ -635,6 +635,20 @@ class ListJoin : public Function {
   }
 };
 
+class ListMaxSize : public Function {
+ public:
+  ListMaxSize() : Function("list.max_size") {}
+  virtual MethodStatus Invoke( Context* context , Value* output ) {
+    if(context->GetArgumentSize() != 1 ||
+       !context->GetArgument(0).IsList()) {
+      return MethodStatus::NewFail("function::list.max_size requires 1 argument,"
+                                   "and it must be list");
+    }
+    output->SetInteger( List::kMaximumListSize );
+    return MethodStatus::kOk;
+  }
+};
+
 template<typename T>
 Module* CreateListModule( T* target ) {
   Handle<Module> handle(target->gc()->NewModule("list"),target->gc());
@@ -658,6 +672,7 @@ Module* CreateListModule( T* target ) {
   ADD("size",ListSize);
   ADD("empty",ListEmpty);
   ADD("join",ListJoin);
+  ADD("max_size",ListMaxSize);
 
 #undef ADD // ADD
 
@@ -917,6 +932,20 @@ class FunctionEmpty: public Function {
   }
 };
 
+class FunctionMaxSize : public Function {
+ public:
+  FunctionMaxSize() : Function("dict.max_size") {}
+  virtual MethodStatus Invoke( Context* context , Value* output ) {
+    if(context->GetArgumentSize() != 1 ||
+       !context->GetArgument(0).IsDict()) {
+      return MethodStatus::NewFail("function::dict.max_size expects 1 argument,"
+                                   "and it must be a dictionary");
+    }
+    output->SetInteger( Dict::kMaximumDictSize );
+    return MethodStatus::kOk;
+  }
+};
+
 template< typename T >
 Module* CreateDictModule( T* engine ) {
   Handle<Module> module( engine->gc()->NewModule("dict") , engine->gc() );
@@ -936,6 +965,7 @@ Module* CreateDictModule( T* engine ) {
   ADD("clear",FunctionClear);
   ADD("size",FunctionSize);
   ADD("empty",FunctionEmpty);
+  ADD("max_size",FunctionMaxSize);
 
 #undef ADD // ADD
 

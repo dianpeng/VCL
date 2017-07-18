@@ -236,6 +236,11 @@ class LexicalScope {
 
  public:
   bool DefineIterator( Zone* );
+  enum {
+    LOCAL_TOO_MUCH = -1 ,
+    LOCAL_DUPLICATE= -2
+  };
+
   int DefineLocal ( ZoneString* );
   int LookupLocal ( ZoneString* );
   int Lookup      ( ZoneString* );
@@ -305,16 +310,15 @@ bool LexicalScope::DefineIterator( Zone* zone ) {
   ++m_iter_prefix;
   int ret = DefineLocal(
       ZoneString::New(zone,vcl::util::Format("@_%d_iter",m_iter_prefix)));
-  if(ret != m_base + static_cast<int>(m_var.size()))
-    return false;
-  return true;
+  DCHECK( ret != LOCAL_DUPLICATE );
+  return ret >= 0;
 }
 
 int LexicalScope::DefineLocal( ZoneString* zone_string ) {
   int ret;
-  if((ret = LookupLocal(zone_string)) >=0) return ret;
+  if((ret = LookupLocal(zone_string)) >=0) return LOCAL_DUPLICATE;
   if(m_var.size() == kMaxLocalVarSize)
-    return -1; // Cannot handle, just too much local variables
+    return LOCAL_TOO_MUCH; // Cannot handle, just too much local variables
   m_var.push_back( zone_string );
   return m_base + static_cast<int>(m_var.size());
 }
@@ -659,9 +663,12 @@ bool Compiler::Compile( const ast::Declare& dec ) {
   }
   DCHECK(m_lex_scope);
   int idx = m_lex_scope->DefineLocal( dec.variable );
-  if(idx < 0) {
+  if(idx == LexicalScope::LOCAL_DUPLICATE) {
     ReportError(dec.location,"Variable %s has been defined before!",
         dec.variable->data());
+    return false;
+  } else if(idx == LexicalScope::LOCAL_TOO_MUCH) {
+    ReportError(dec.location,"Too much local variables!");
     return false;
   }
   return true;
@@ -1030,7 +1037,7 @@ bool Compiler::Compile( const ast::For& node ) {
   if(!Compile(*node.iterator)) return false;
 
   if(!m_lex_scope->DefineIterator(m_zone)) {
-    ReportError(node.location,"Too much local variables");
+    ReportError(node.location,"Too much local variables!");
     return false;
   }
 
@@ -1050,11 +1057,25 @@ bool Compiler::Compile( const ast::For& node ) {
     loop_hdr = m_procedure->code_buffer().position();
 
     // Define local variable and derefence from the iterator objects
-    scope.DefineLocal( node.key );
-    __ iterk(node.location);
+    {
+      int ret;
+      if((ret=scope.DefineLocal( node.key )) == LexicalScope::LOCAL_TOO_MUCH) {
+        ReportError(node.location,"Too much local variables!");
+        return false;
+      }
+      DCHECK( ret >= 0);
+      __ iterk(node.location);
+    }
 
     if(node.val) {
-      scope.DefineLocal( node.val );
+      int ret = scope.DefineLocal( node.val );
+      if(ret == LexicalScope::LOCAL_TOO_MUCH) {
+        ReportError(node.location,"Too much local variables!");
+        return false;
+      } else if(ret == LexicalScope::LOCAL_DUPLICATE) {
+        ReportError(node.location,"Variable %s has been defined before!",node.val->data());
+        return false;
+      }
       __ iterv(node.location);
     }
 
@@ -1154,7 +1175,7 @@ bool Compiler::CompileAnonymousSub( const ast::Sub& sub ) {
 
     // Arguments
     for( size_t i = 0 ; i < sub.arg_list.size(); ++i ) {
-      scope.DefineLocal(sub.arg_list[i]);
+      CHECK(scope.DefineLocal(sub.arg_list[i])>=0);
     }
     if(!Compile(sub)) return false;
   }
@@ -1182,7 +1203,7 @@ bool Compiler::Compile( const CompilationUnit::SubList& sub_list ) {
 
     // Generate argument list as local variables
     for( size_t i = 0 ; i < sub.arg_list.size() ; ++i ) {
-      scope.DefineLocal( sub.arg_list[i] );
+      CHECK(scope.DefineLocal( sub.arg_list[i] ) >=0);
     }
 
     // Generate all sub list's body

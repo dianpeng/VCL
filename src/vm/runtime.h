@@ -36,6 +36,8 @@ class VMGuard {
 // and is able to resume or suspend a certain function execution on demand, which
 // is part of our design.
 class Runtime {
+  // Default value stack initialized size
+  static const size_t kDefaultValueStackSize = 512;
 
   // A Frame represents a calling frame inside of the call stack , it records
   // all runtime information about a function call, regardless of it is a c
@@ -98,7 +100,7 @@ class Runtime {
     m_v1(),
     m_yield(false),
     m_vm_running(false)
-  {}
+  { m_stack.reserve( kDefaultValueStackSize ); }
 
  public: // This a stateful APIs which is sololy used by Context object.
          // In most case you should not use the following APIs since it
