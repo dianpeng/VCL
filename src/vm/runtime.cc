@@ -93,13 +93,28 @@ MethodStatus Runtime::Main( Value* output , int64_t instr_count ) {
   DCHECK( instr_count > 0 );
   detail::VMGuard guard(this);
 
+  // Argument holder for VM's instruction immediate number
   uint32_t arg;
+
+  // Result of execution
   MethodStatus result = MethodStatus::kOk;
+
+  // CompiledCode object for current context
   CompiledCode* cc = context()->compiled_code();
+
+  // Current executed SubRoutine object
   SubRoutine* sub_routine = CurrentFrame()->sub_routine();
+
+  // Current Procedure object
   Procedure* procedure = sub_routine->procedure();
+
+  // Instruction iterator
   BytecodeBuffer::Iterator code =
     procedure->code_buffer().BeginAt(CurrentFrame()->pc);
+
+  // Base pointer for current execution frame , cached here for avoiding
+  // cache miss purpose
+  size_t base = CurrentFrame()->base;
 
   // Jump table for threading interpretation
   static void* kLabels[] = {
@@ -272,37 +287,37 @@ MethodStatus Runtime::Main( Value* output , int64_t instr_count ) {
 #undef DO // DO
 
   vm_instr(BC_SADD) {
-    verify((result = Back(code.arg()).SelfAdd( context(), Top(0))));
+    verify((result = Back(base,code.arg()).SelfAdd( context(), Top(0))));
     Pop(1);
     next();
   }
 
   vm_instr(BC_SSUB) {
-    verify((result = Back(code.arg()).SelfSub( context(), Top(0))));
+    verify((result = Back(base,code.arg()).SelfSub( context(), Top(0))));
     Pop(1);
     next();
   }
 
   vm_instr(BC_SMUL) {
-    verify((result = Back(code.arg()).SelfMul( context(), Top(0))));
+    verify((result = Back(base,code.arg()).SelfMul( context(), Top(0))));
     Pop(1);
     next();
   }
 
   vm_instr(BC_SDIV) {
-    verify((result = Back(code.arg()).SelfDiv( context(), Top(0))));
+    verify((result = Back(base,code.arg()).SelfDiv( context(), Top(0))));
     Pop(1);
     next();
   }
 
   vm_instr(BC_SMOD) {
-    verify((result = Back(code.arg()).SelfMod( context() , Top(0))));
+    verify((result = Back(base,code.arg()).SelfMod( context() , Top(0))));
     Pop(1);
     next();
   }
 
   vm_instr(BC_UNSET) {
-    verify((result = Back(code.arg()).Unset(context())));
+    verify((result = Back(base,code.arg()).Unset(context())));
     next();
   }
 
@@ -502,12 +517,12 @@ MethodStatus Runtime::Main( Value* output , int64_t instr_count ) {
   }
 
   vm_instr(BC_SLOAD) {
-    Push(Back(code.arg()));
+    Push(Back(base,code.arg()));
     next();
   }
 
   vm_instr(BC_SSTORE) {
-    Back(code.arg()) = Top(0);
+    Back(base,code.arg()) = Top(0);
     Pop(1);
     next();
   }
@@ -836,9 +851,12 @@ MethodStatus Runtime::Main( Value* output , int64_t instr_count ) {
           default: VCL_UNREACHABLE();
         }
       default:
+	// Flush context object stored as local variable due to the
+	// fact we have a new frame because a new function call
         sub_routine = CurrentFrame()->sub_routine();
         procedure = sub_routine->procedure();
         code = procedure->code_buffer().BeginAt(CurrentFrame()->pc);
+	base = CurrentFrame()->base;
         dispatch(*code);
         break;
     }
@@ -852,6 +870,7 @@ MethodStatus Runtime::Main( Value* output , int64_t instr_count ) {
     sub_routine = CurrentFrame()->sub_routine();
     procedure = sub_routine->procedure();
     code = procedure->code_buffer().BeginAt(CurrentFrame()->pc);
+    base = CurrentFrame()->base;
     dispatch(*code);
   }
 

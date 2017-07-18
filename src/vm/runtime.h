@@ -116,7 +116,8 @@ class Runtime {
   Value GetArgument( size_t index ) const {
     size_t arg_size = GetArgumentSize();
     DCHECK( index < arg_size );
-    return Back(index);
+    DCHECK( !m_frame.empty() );
+    return Back(CurrentFrame()->base,index);
   }
 
  public:
@@ -153,18 +154,18 @@ class Runtime {
     m_stack.resize( m_stack.size() - count );
   }
   void Replace( const Value& value ) { m_stack.back() = value; }
-  Value& Back( size_t index ) {
-    DCHECK( index + CurrentFrame()->base < m_stack.size() );
-    return m_stack[index + CurrentFrame()->base];
+  Value& Back( size_t base , size_t index ) {
+    DCHECK( index + base < m_stack.size() );
+    return m_stack[index + base];
   }
   Value& Top( size_t index ) {
     DCHECK( index < m_stack.size() );
     const size_t idx = (m_stack.size() - index - 1);
     return m_stack[idx];
   }
-  const Value& Back( size_t index ) const {
-    DCHECK( index + CurrentFrame()->base < m_stack.size() );
-    return m_stack[index + CurrentFrame()->base];
+  const Value& Back( size_t base , size_t index ) const {
+    DCHECK( index + base < m_stack.size() );
+    return m_stack[index + base];
   }
   const Value& Top( size_t index ) const {
     DCHECK( index < m_stack.size() );
