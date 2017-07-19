@@ -17,10 +17,13 @@ class CompilationUnitBuilder {
   typedef std::map<std::string, CompilationUnit::SubListPtr> SubListIndex;
 
  public:
-  CompilationUnitBuilder(CompiledCode* cc, CompilationUnit* cu,
-                         SourceRepo* repo, size_t max_include,
+  CompilationUnitBuilder(CompiledCode* cc,
+                         CompilationUnit* cu,
+                         SourceRepo* repo,
+                         size_t max_include,
                          const std::string& folder_hint,
-                         bool allow_absolute_path, std::string* error)
+                         bool allow_absolute_path,
+                         std::string* error)
       : m_repo(repo),
         m_cur_pu(repo->GetEntry()),
         m_cc(cc),
@@ -115,12 +118,16 @@ class PUPusher {
 };
 
 void CompilationUnitBuilder::ReportError(const vcl::util::CodeLocation& loc,
-                                         const char* format, ...) {
+                                         const char* format,
+                                         ...) {
   va_list vl;
   va_start(vl, format);
 
   *m_error = vcl::util::ReportErrorV(m_cur_pu->source_code_info->source_code,
-                                     loc, "[compilation-unit]", format, vl);
+                                     loc,
+                                     "[compilation-unit]",
+                                     format,
+                                     vl);
 }
 
 vcl::util::FilePathStatus CompilationUnitBuilder::FormatFilePath(
@@ -183,7 +190,8 @@ bool CompilationUnitBuilder::DoExpand(const File& root) {
 
 bool CompilationUnitBuilder::DoInclude(const Include& inc) {
   if (m_total_include >= m_max_include) {
-    ReportError(inc.location, "too many include directives, more than %zu",
+    ReportError(inc.location,
+                "too many include directives, more than %zu",
                 m_total_include);
     return false;
   }
@@ -271,12 +279,15 @@ void CompilationUnit::Serialize(std::ostream& output) {
   }
 }
 
-bool CompilationUnit::Generate(CompilationUnit* cu, CompiledCode* cc,
-                               SourceRepo* repo, size_t max_include,
+bool CompilationUnit::Generate(CompilationUnit* cu,
+                               CompiledCode* cc,
+                               SourceRepo* repo,
+                               size_t max_include,
                                const std::string& folder_hint,
-                               bool allow_absolute_path, std::string* error) {
-  detail::CompilationUnitBuilder builder(cc, cu, repo, max_include, folder_hint,
-                                         allow_absolute_path, error);
+                               bool allow_absolute_path,
+                               std::string* error) {
+  detail::CompilationUnitBuilder builder(
+      cc, cu, repo, max_include, folder_hint, allow_absolute_path, error);
 
   return builder.Build();
 }

@@ -161,7 +161,8 @@ class ZoneString : public ZoneObject {
     const size_t len = strlen(str);
     void* buf = zone->Malloc<void*>(sizeof(ZoneString) + len + 1);
     return ::new (buf) ZoneString(
-        str, static_cast<void*>((static_cast<char*>(buf) + sizeof(ZoneString))),
+        str,
+        static_cast<void*>((static_cast<char*>(buf) + sizeof(ZoneString))),
         len);
   }
 

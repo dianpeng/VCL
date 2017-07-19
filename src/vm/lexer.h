@@ -121,7 +121,11 @@ inline bool TokenIsLogicOperator(Token tk) {
 
 struct Lexeme {
   Token token;
-  boost::variant<int32_t, double, std::string, bool, vcl::util::Duration,
+  boost::variant<int32_t,
+                 double,
+                 std::string,
+                 bool,
+                 vcl::util::Duration,
                  vcl::util::Size>
       value;
   size_t token_length;
@@ -173,8 +177,8 @@ class Lexer {
 
   vcl::util::CodeLocation location() const {
     CHECK(m_pos >= static_cast<int>(m_lexeme.token_length));
-    return vcl::util::CodeLocation(m_line, m_ccount,
-                                   m_pos - m_lexeme.token_length);
+    return vcl::util::CodeLocation(
+        m_line, m_ccount, m_pos - m_lexeme.token_length);
   }
 
  public:
@@ -256,14 +260,19 @@ class Lexer {
     return Lookahead(p, fallback);
   }
 
-  const Lexeme& Lookahead(Token token1, int nchar1, Token token2, int nchar2,
-                          Token fallback) {
+  const Lexeme& Lookahead(
+      Token token1, int nchar1, Token token2, int nchar2, Token fallback) {
     Predicator p[] = {{token1, nchar1}, {token2, nchar2}};
     return Lookahead(p, fallback);
   }
 
-  const Lexeme& Lookahead(Token token1, int nchar1, Token token2, int nchar2,
-                          Token token3, int nchar3, Token fallback) {
+  const Lexeme& Lookahead(Token token1,
+                          int nchar1,
+                          Token token2,
+                          int nchar2,
+                          Token token3,
+                          int nchar3,
+                          Token fallback) {
     Predicator p[] = {{token1, nchar1}, {token2, nchar2}, {token3, nchar3}};
     return Lookahead(p, fallback);
   }

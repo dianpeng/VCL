@@ -22,8 +22,12 @@ class ZoneString;
 
 namespace detail {
 
-typedef boost::variant<int32_t, double, vcl::String*, vcl::util::Size,
-                       vcl::util::Duration, vcl::ACL*>
+typedef boost::variant<int32_t,
+                       double,
+                       vcl::String*,
+                       vcl::util::Size,
+                       vcl::util::Duration,
+                       vcl::ACL*>
     Value;
 enum {
   VALUE_TYPE_INTEGER,
@@ -58,7 +62,8 @@ DEFINE_TYPE_MAP(int32_t, VALUE_TYPE_INTEGER, int32_t)
 DEFINE_TYPE_MAP(double, VALUE_TYPE_REAL, double)
 DEFINE_TYPE_MAP(vcl::String*, VALUE_TYPE_STRING, vcl::String*)
 DEFINE_TYPE_MAP(vcl::util::Size, VALUE_TYPE_SIZE, const vcl::util::Size&)
-DEFINE_TYPE_MAP(vcl::util::Duration, VALUE_TYPE_DURATION,
+DEFINE_TYPE_MAP(vcl::util::Duration,
+                VALUE_TYPE_DURATION,
                 const vcl::util::Duration&)
 DEFINE_TYPE_MAP(vcl::ACL*, VALUE_TYPE_ACL, vcl::ACL*)
 
@@ -83,7 +88,8 @@ struct PrimitiveComparator {
 // runtime.
 class Procedure {
  public:
-  Procedure(const std::string& name, const std::string& protocol,
+  Procedure(const std::string& name,
+            const std::string& protocol,
             size_t arg_count)
       : m_name(name),
         m_code_buffer(),

@@ -299,8 +299,8 @@ bool Lexer::TryTokenAsExtendedVar() {
 const Lexeme& Lexer::LexerError() {
   m_lexeme.token = TK_ERROR;
   m_lexeme.is_symbol = false;
-  m_lexeme.value = ReportError(m_source, location(), "syntax",
-                               "unknown character %c!", m_source[m_pos]);
+  m_lexeme.value = ReportError(
+      m_source, location(), "syntax", "unknown character %c!", m_source[m_pos]);
   return m_lexeme;
 }
 

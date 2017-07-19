@@ -225,7 +225,8 @@ class BytecodeBuffer {
     m_buffer[m_size++] = static_cast<uint8_t>(op);
   }
 
-  inline void Emit(const vcl::util::CodeLocation& loc, Bytecode op,
+  inline void Emit(const vcl::util::CodeLocation& loc,
+                   Bytecode op,
                    uint32_t oper) {
     m_source_info[m_size] = loc;
 

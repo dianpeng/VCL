@@ -1112,8 +1112,9 @@ ast::Prefix* Parser::ParsePrefix(zone::ZoneString* prefix,
           // 1. New temproary variable
           DCHECK(m_lexical_scope);
           m_lexical_scope->statement_list.Add(
-              m_zone, ast::NewTempVariableDeclare(m_zone, temp_name, ret,
-                                                  ret->location));
+              m_zone,
+              ast::NewTempVariableDeclare(
+                  m_zone, temp_name, ret, ret->location));
 
           // 2. Create a new Prefix expression here to override the existed
           // prefix expression
@@ -1129,10 +1130,11 @@ ast::Prefix* Parser::ParsePrefix(zone::ZoneString* prefix,
           ParserError("Expect a variable name after \"::\" operation!");
           return NULL;
         }
-        ret->list.Add(m_zone, ast::Prefix::Component(
-                                  zone::ZoneString::New(
-                                      m_zone, m_lexer.lexeme().string()),
-                                  ast::Prefix::Component::DOT));
+        ret->list.Add(
+            m_zone,
+            ast::Prefix::Component(
+                zone::ZoneString::New(m_zone, m_lexer.lexeme().string()),
+                ast::Prefix::Component::DOT));
         if (!m_lexer.Try(TK_LPAR)) {
           ParserError(
               "Expect function call argument list in method call "
@@ -1376,10 +1378,11 @@ ast::AST* Parser::ParseStringInterpolation() {
         break;
       }
       case TK_SEGMENT:
-        interp->list.Add(m_zone, new (m_zone) ast::String(
-                                     m_lexer.location(),
-                                     zone::ZoneString::New(
-                                         m_zone, m_lexer.lexeme().string())));
+        interp->list.Add(
+            m_zone,
+            new (m_zone) ast::String(
+                m_lexer.location(),
+                zone::ZoneString::New(m_zone, m_lexer.lexeme().string())));
         m_lexer.Next();
         break;
       default:  // We should never see any other tokens

@@ -36,9 +36,12 @@ class CompilationUnitBuilder;
 
 class CompilationUnit {
  public:
-  static bool Generate(CompilationUnit* output, CompiledCode* cc,
-                       SourceRepo* repo, size_t max_include,
-                       const std::string& folder_hint, bool allow_absolute_path,
+  static bool Generate(CompilationUnit* output,
+                       CompiledCode* cc,
+                       SourceRepo* repo,
+                       size_t max_include,
+                       const std::string& folder_hint,
+                       bool allow_absolute_path,
                        std::string* error);
 
  public:

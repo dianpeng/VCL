@@ -3,7 +3,8 @@
 namespace vcl {
 namespace vm {
 
-int Runtime::EnterFunction(const Value& callable, size_t argument_size,
+int Runtime::EnterFunction(const Value& callable,
+                           size_t argument_size,
                            MethodStatus* status) {
   // 1. Check whether we are calling a callable type
   if (!callable.IsFunction() && !callable.IsSubRoutine()) {
@@ -25,7 +26,8 @@ int Runtime::EnterFunction(const Value& callable, size_t argument_size,
     if (sub_routine->argument_size() != argument_size) {
       status->set_fail("sub %s accept %zu argument , but got %zu",
                        sub_routine->name().c_str(),
-                       sub_routine->argument_size(), argument_size);
+                       sub_routine->argument_size(),
+                       argument_size);
       return FUNC_FAILED;
     }
 
@@ -1127,7 +1129,8 @@ fail:
 void Runtime::UnwindStack(std::ostringstream* output) const {
   int count = 0;
   for (std::vector<Frame>::const_reverse_iterator itr = m_frame.rbegin();
-       itr != m_frame.rend(); ++itr) {
+       itr != m_frame.rend();
+       ++itr) {
     const Frame& frame = *itr;
     (*output) << count << ". ";
 
@@ -1187,8 +1190,8 @@ MethodStatus Runtime::ReportError(const std::string& error) const {
     }
     prefix = formatter.str();
   }
-  return MethodStatus::NewFail("%s%s", prefix.c_str(),
-                               unwind_stk.str().c_str());
+  return MethodStatus::NewFail(
+      "%s%s", prefix.c_str(), unwind_stk.str().c_str());
 }
 
 void Runtime::Mark() {

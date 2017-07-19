@@ -527,7 +527,9 @@ struct File : public AST {
 };
 
 // Helper function to create specialized AST object
-Declare* NewTempVariableDeclare(zone::Zone*, zone::ZoneString*, Prefix*,
+Declare* NewTempVariableDeclare(zone::Zone*,
+                                zone::ZoneString*,
+                                Prefix*,
                                 const vcl::util::CodeLocation&);
 
 // Serialize to s-expression to ease pain of future testing

@@ -475,7 +475,10 @@ struct Compiler {
     }
   }
 
-  template <typename T, typename Program, bool IPV4, bool Wildcard,
+  template <typename T,
+            typename Program,
+            bool IPV4,
+            bool Wildcard,
             size_t ComponentSize>
   bool DoCompile(const char* pattern, Program* ptr) {
     T tokenizer(pattern);

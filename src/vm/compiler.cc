@@ -21,7 +21,9 @@ class LexicalScope;
 // one by one
 class Compiler {
  public:
-  Compiler(CompiledCode* cc, zone::Zone* zone, const CompilationUnit& cu,
+  Compiler(CompiledCode* cc,
+           zone::Zone* zone,
+           const CompilationUnit& cu,
            std::string* error)
       : m_unit(cu),
         m_cc(cc),
@@ -169,9 +171,12 @@ class Compiler {
 // manage all the local variable and stack status
 class LexicalScope {
  public:
-  LexicalScope(Compiler* comp, Procedure* procedure,
-               const vcl::util::CodeLocation& location, bool no_pop = false,
-               bool is_loop = false, bool is_function = false)
+  LexicalScope(Compiler* comp,
+               Procedure* procedure,
+               const vcl::util::CodeLocation& location,
+               bool no_pop = false,
+               bool is_loop = false,
+               bool is_function = false)
       : m_base(0),
         m_var(),
         m_parent(comp->m_lex_scope),
@@ -350,12 +355,16 @@ LexicalScope::~LexicalScope() {
 }
 
 void Compiler::ReportError(const vcl::util::CodeLocation& loc,
-                           const char* format, ...) {
+                           const char* format,
+                           ...) {
   va_list vlist;
   va_start(vlist, format);
   *m_error = vcl::util::ReportErrorV(
-      m_cc->IndexSourceCodeInfo(m_cur_source_index)->source_code, loc,
-      "[compiler]", format, vlist);
+      m_cc->IndexSourceCodeInfo(m_cur_source_index)->source_code,
+      loc,
+      "[compiler]",
+      format,
+      vlist);
 }
 
 bool Compiler::Compile(const ast::LexScope& body) {
@@ -702,7 +711,8 @@ bool Compiler::Compile(const ast::Declare& dec) {
   DCHECK(m_lex_scope);
   int idx = m_lex_scope->DefineLocal(dec.variable);
   if (idx == LexicalScope::LOCAL_DUPLICATE) {
-    ReportError(dec.location, "Variable %s has been defined before!",
+    ReportError(dec.location,
+                "Variable %s has been defined before!",
                 dec.variable->data());
     return false;
   } else if (idx == LexicalScope::LOCAL_TOO_MUCH) {
@@ -718,7 +728,8 @@ bool Compiler::Compile(const ast::Prefix& pref) {
 
 bool Compiler::CompilePrefixList(
     const vcl::util::CodeLocation& loc,
-    const zone::ZoneVector<ast::Prefix::Component>& list, size_t end) {
+    const zone::ZoneVector<ast::Prefix::Component>& list,
+    size_t end) {
   const ast::Prefix::Component& first = list.First();
   CHECK(first.tag == ast::Prefix::Component::DOT);
   if (!CompileVariable(loc, first.var)) return false;
@@ -755,8 +766,8 @@ bool Compiler::CompilePrefixList(
 }
 
 bool Compiler::CompileLHSPrefix(const ast::Prefix& prefix) {
-  return CompilePrefixList(prefix.location, prefix.list,
-                           prefix.list.size() - 1);
+  return CompilePrefixList(
+      prefix.location, prefix.list, prefix.list.size() - 1);
 }
 
 template <int OP>
@@ -766,8 +777,8 @@ bool Compiler::CompileComponent(const vcl::util::CodeLocation& loc,
     case ast::Prefix::Component::DOT: {
       int id = CompileString(loc, comp.var);
       if (id < 0) return false;
-      m_procedure->code_buffer().Emit(loc, BuildBytecode<CATEGORY_PROP, OP>(),
-                                      id);
+      m_procedure->code_buffer().Emit(
+          loc, BuildBytecode<CATEGORY_PROP, OP>(), id);
       break;
     }
     case ast::Prefix::Component::INDEX: {
@@ -778,8 +789,8 @@ bool Compiler::CompileComponent(const vcl::util::CodeLocation& loc,
     case ast::Prefix::Component::ATTRIBUTE: {
       int id = CompileString(loc, comp.var);
       if (id < 0) return false;
-      m_procedure->code_buffer().Emit(loc, BuildBytecode<CATEGORY_ATTR, OP>(),
-                                      id);
+      m_procedure->code_buffer().Emit(
+          loc, BuildBytecode<CATEGORY_ATTR, OP>(), id);
       break;
     }
     default:
@@ -1093,7 +1104,8 @@ bool Compiler::Compile(const ast::For& node) {
         ReportError(node.location, "Too much local variables!");
         return false;
       } else if (ret == LexicalScope::LOCAL_DUPLICATE) {
-        ReportError(node.location, "Variable %s has been defined before!",
+        ReportError(node.location,
+                    "Variable %s has been defined before!",
                     node.val->data());
         return false;
       }
@@ -1198,8 +1210,8 @@ bool Compiler::CompileAnonymousSub(const ast::Sub& sub) {
   m_procedure = CompiledCodeBuilder(m_cc).CreateSubRoutine(sub, &index);
   {
     // Setup a function lexical scope since it is a new function/subroutine
-    LexicalScope scope(this, m_procedure, sub.body->location_end, true, false,
-                       true);
+    LexicalScope scope(
+        this, m_procedure, sub.body->location_end, true, false, true);
 
     // Arguments
     for (size_t i = 0; i < sub.arg_list.size(); ++i) {
@@ -1227,8 +1239,8 @@ bool Compiler::Compile(const CompilationUnit::SubList& sub_list) {
 
   {
     // Setup a function lexical scope
-    LexicalScope scope(this, m_procedure, sub.body->location_end, true, false,
-                       true);
+    LexicalScope scope(
+        this, m_procedure, sub.body->location_end, true, false, true);
 
     // Generate argument list as local variables
     for (size_t i = 0; i < sub.arg_list.size(); ++i) {
@@ -1403,7 +1415,9 @@ bool Compiler::DoCompile() {
 namespace vcl {
 namespace vm {
 
-bool Compile(CompiledCode* cc, zone::Zone* zone, const CompilationUnit& cu,
+bool Compile(CompiledCode* cc,
+             zone::Zone* zone,
+             const CompilationUnit& cu,
              std::string* error) {
   ::Compiler compiler(cc, zone, cu, error);
   return compiler.DoCompile();

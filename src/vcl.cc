@@ -22,7 +22,8 @@ const MethodStatus MethodStatus::kYield(MethodStatus::METHOD_YIELD);
 const MethodStatus MethodStatus::kUnimplemented(
     MethodStatus::METHOD_UNIMPLEMENTED);
 
-MethodStatus Value::GetProperty(Context* context, const String& key,
+MethodStatus Value::GetProperty(Context* context,
+                                const String& key,
                                 Value* output) const {
   if (IsObject()) {
     return object()->GetProperty(context, key, output);
@@ -32,7 +33,8 @@ MethodStatus Value::GetProperty(Context* context, const String& key,
   }
 }
 
-MethodStatus Value::SetProperty(Context* context, const String& key,
+MethodStatus Value::SetProperty(Context* context,
+                                const String& key,
                                 const Value& value) {
   if (IsObject()) {
     return object()->SetProperty(context, key, value);
@@ -42,7 +44,8 @@ MethodStatus Value::SetProperty(Context* context, const String& key,
   }
 }
 
-MethodStatus Value::GetAttribute(Context* context, const String& key,
+MethodStatus Value::GetAttribute(Context* context,
+                                 const String& key,
                                  Value* output) const {
   if (IsObject()) {
     return object()->GetAttribute(context, key, output);
@@ -52,7 +55,8 @@ MethodStatus Value::GetAttribute(Context* context, const String& key,
   }
 }
 
-MethodStatus Value::SetAttribute(Context* context, const String& key,
+MethodStatus Value::SetAttribute(Context* context,
+                                 const String& key,
                                  const Value& value) {
   if (IsObject()) {
     return object()->SetAttribute(context, key, value);
@@ -62,7 +66,8 @@ MethodStatus Value::SetAttribute(Context* context, const String& key,
   }
 }
 
-MethodStatus Value::GetIndex(Context* context, const Value& index,
+MethodStatus Value::GetIndex(Context* context,
+                             const Value& index,
                              Value* output) const {
   if (IsObject()) {
     return object()->GetIndex(context, index, output);
@@ -72,7 +77,8 @@ MethodStatus Value::GetIndex(Context* context, const Value& index,
   }
 }
 
-MethodStatus Value::SetIndex(Context* context, const Value& index,
+MethodStatus Value::SetIndex(Context* context,
+                             const Value& index,
                              const Value& value) {
   if (IsObject()) {
     return object()->SetIndex(context, index, value);
@@ -168,8 +174,11 @@ struct ModOp {
 };
 
 template <typename T>
-bool OperatorImpl(Context* context, const Value& left, const Value& right,
-                  Value* output, MethodStatus* status) {
+bool OperatorImpl(Context* context,
+                  const Value& left,
+                  const Value& right,
+                  Value* output,
+                  MethodStatus* status) {
   T handler;
   switch (left.type()) {
     case TYPE_INTEGER: {
@@ -212,7 +221,8 @@ bool OperatorImpl(Context* context, const Value& left, const Value& right,
       return MethodStatus::NewUnimplemented(
           "Arithmatic operator cannot work between type "
           "%s and %s",
-          left.type_name(), right.type_name());
+          left.type_name(),
+          right.type_name());
     case TYPE_BOOLEAN: {
       if (right.IsReal()) {
         if (!handler.CheckRHS(right.GetReal())) {
@@ -242,7 +252,8 @@ bool OperatorImpl(Context* context, const Value& left, const Value& right,
 
 }  // namespace
 
-MethodStatus Value::Add(Context* context, const Value& value,
+MethodStatus Value::Add(Context* context,
+                        const Value& value,
                         Value* output) const {
   MethodStatus status;
   if (OperatorImpl<AddOp>(context, *this, value, output, &status))
@@ -251,7 +262,8 @@ MethodStatus Value::Add(Context* context, const Value& value,
     return object()->Add(context, value, output);
 }
 
-MethodStatus Value::Sub(Context* context, const Value& value,
+MethodStatus Value::Sub(Context* context,
+                        const Value& value,
                         Value* output) const {
   MethodStatus status;
   if (OperatorImpl<SubOp>(context, *this, value, output, &status))
@@ -260,7 +272,8 @@ MethodStatus Value::Sub(Context* context, const Value& value,
     return object()->Sub(context, value, output);
 }
 
-MethodStatus Value::Mul(Context* context, const Value& value,
+MethodStatus Value::Mul(Context* context,
+                        const Value& value,
                         Value* output) const {
   MethodStatus status;
   if (OperatorImpl<MulOp>(context, *this, value, output, &status))
@@ -269,7 +282,8 @@ MethodStatus Value::Mul(Context* context, const Value& value,
     return object()->Mul(context, value, output);
 }
 
-MethodStatus Value::Div(Context* context, const Value& value,
+MethodStatus Value::Div(Context* context,
+                        const Value& value,
                         Value* output) const {
   MethodStatus status;
   if (OperatorImpl<DivOp>(context, *this, value, output, &status))
@@ -278,7 +292,8 @@ MethodStatus Value::Div(Context* context, const Value& value,
     return object()->Div(context, value, output);
 }
 
-MethodStatus Value::Mod(Context* context, const Value& value,
+MethodStatus Value::Mod(Context* context,
+                        const Value& value,
                         Value* output) const {
   MethodStatus status;
   if (IsReal() || value.IsReal()) {
@@ -333,7 +348,8 @@ MethodStatus Value::SelfMod(Context* context, const Value& value) {
     return object()->SelfMod(context, value);
 }
 
-MethodStatus Value::Match(Context* context, const Value& value,
+MethodStatus Value::Match(Context* context,
+                          const Value& value,
                           bool* output) const {
   if (IsObject())
     return object()->Match(context, value, output);
@@ -343,7 +359,8 @@ MethodStatus Value::Match(Context* context, const Value& value,
   }
 }
 
-MethodStatus Value::NotMatch(Context* context, const Value& value,
+MethodStatus Value::NotMatch(Context* context,
+                             const Value& value,
                              bool* output) const {
   if (IsObject())
     return object()->NotMatch(context, value, output);
@@ -378,7 +395,8 @@ MethodStatus Value::Unset(Context* context) {
   return MethodStatus::kOk;
 }
 
-bool Value::ConvertToString(Context* context, const Value& value,
+bool Value::ConvertToString(Context* context,
+                            const Value& value,
                             String** output) {
   switch (value.type()) {
     case TYPE_INTEGER:
@@ -431,7 +449,8 @@ fail:
   return false;
 }
 
-bool Value::ConvertToInteger(Context* context, const Value& value,
+bool Value::ConvertToInteger(Context* context,
+                             const Value& value,
                              int32_t* output) {
   switch (value.type()) {
     case TYPE_INTEGER:
@@ -471,7 +490,8 @@ fail:
   return false;
 }
 
-bool Value::ConvertToReal(Context* context, const Value& value,
+bool Value::ConvertToReal(Context* context,
+                          const Value& value,
                           double* output) {
   switch (value.type()) {
     case TYPE_INTEGER:
@@ -511,7 +531,8 @@ fail:
   return false;
 }
 
-bool Value::ConvertToBoolean(Context* context, const Value& value,
+bool Value::ConvertToBoolean(Context* context,
+                             const Value& value,
                              bool* output) {
   if (value.ToBoolean(context, output)) {
     return true;
@@ -522,7 +543,8 @@ bool Value::ConvertToBoolean(Context* context, const Value& value,
 
 namespace {
 
-typedef MethodStatus (Object::*CompareCallback)(Context*, const Value&,
+typedef MethodStatus (Object::*CompareCallback)(Context*,
+                                                const Value&,
                                                 bool*) const;
 
 struct LessOp {
@@ -568,8 +590,11 @@ struct NotEqualOp {
 };
 
 template <typename T>
-MethodStatus ComparisonOp(Context* context, CompareCallback callback,
-                          const Value& left, const Value& right, bool* output) {
+MethodStatus ComparisonOp(Context* context,
+                          CompareCallback callback,
+                          const Value& left,
+                          const Value& right,
+                          bool* output) {
   MethodStatus result;
   T handler;
   switch (left.type()) {
@@ -622,38 +647,44 @@ MethodStatus ComparisonOp(Context* context, CompareCallback callback,
 }
 }  // namespace
 
-MethodStatus Value::Less(Context* context, const Value& value,
+MethodStatus Value::Less(Context* context,
+                         const Value& value,
                          bool* output) const {
   return ComparisonOp<LessOp>(context, &Object::Less, *this, value, output);
 }
 
-MethodStatus Value::LessEqual(Context* context, const Value& value,
+MethodStatus Value::LessEqual(Context* context,
+                              const Value& value,
                               bool* output) const {
-  return ComparisonOp<LessEqualOp>(context, &Object::LessEqual, *this, value,
-                                   output);
+  return ComparisonOp<LessEqualOp>(
+      context, &Object::LessEqual, *this, value, output);
 }
 
-MethodStatus Value::Greater(Context* context, const Value& value,
+MethodStatus Value::Greater(Context* context,
+                            const Value& value,
                             bool* output) const {
-  return ComparisonOp<GreaterOp>(context, &Object::Greater, *this, value,
-                                 output);
+  return ComparisonOp<GreaterOp>(
+      context, &Object::Greater, *this, value, output);
 }
 
-MethodStatus Value::GreaterEqual(Context* context, const Value& value,
+MethodStatus Value::GreaterEqual(Context* context,
+                                 const Value& value,
                                  bool* output) const {
-  return ComparisonOp<GreaterEqualOp>(context, &Object::GreaterEqual, *this,
-                                      value, output);
+  return ComparisonOp<GreaterEqualOp>(
+      context, &Object::GreaterEqual, *this, value, output);
 }
 
-MethodStatus Value::Equal(Context* context, const Value& value,
+MethodStatus Value::Equal(Context* context,
+                          const Value& value,
                           bool* output) const {
   return ComparisonOp<EqualOp>(context, &Object::Equal, *this, value, output);
 }
 
-MethodStatus Value::NotEqual(Context* context, const Value& value,
+MethodStatus Value::NotEqual(Context* context,
+                             const Value& value,
                              bool* output) const {
-  return ComparisonOp<NotEqualOp>(context, &Object::NotEqual, *this, value,
-                                  output);
+  return ComparisonOp<NotEqualOp>(
+      context, &Object::NotEqual, *this, value, output);
 }
 
 MethodStatus Value::ToString(Context* context, std::string* output) const {
@@ -776,7 +807,8 @@ MethodStatus Value::NewIterator(Context* context, Iterator** output) {
 // ======================================================================
 // Object Implementation
 // ======================================================================
-MethodStatus Object::GetProperty(Context* context, const String& key,
+MethodStatus Object::GetProperty(Context* context,
+                                 const String& key,
                                  Value* output) const {
   VCL_UNUSED(context);
   VCL_UNUSED(key);
@@ -787,7 +819,8 @@ MethodStatus Object::GetProperty(Context* context, const String& key,
       type_name());
 }
 
-MethodStatus Object::SetProperty(Context* context, const String& key,
+MethodStatus Object::SetProperty(Context* context,
+                                 const String& key,
                                  const Value& output) {
   VCL_UNUSED(context);
   VCL_UNUSED(key);
@@ -798,7 +831,8 @@ MethodStatus Object::SetProperty(Context* context, const String& key,
       type_name());
 }
 
-MethodStatus Object::GetAttribute(Context* context, const String& key,
+MethodStatus Object::GetAttribute(Context* context,
+                                  const String& key,
                                   Value* output) const {
   VCL_UNUSED(context);
   VCL_UNUSED(key);
@@ -809,7 +843,8 @@ MethodStatus Object::GetAttribute(Context* context, const String& key,
       type_name());
 }
 
-MethodStatus Object::SetAttribute(Context* context, const String& key,
+MethodStatus Object::SetAttribute(Context* context,
+                                  const String& key,
                                   const Value& output) {
   VCL_UNUSED(context);
   VCL_UNUSED(key);
@@ -820,7 +855,8 @@ MethodStatus Object::SetAttribute(Context* context, const String& key,
       type_name());
 }
 
-MethodStatus Object::GetIndex(Context* context, const Value& index,
+MethodStatus Object::GetIndex(Context* context,
+                              const Value& index,
                               Value* output) const {
   VCL_UNUSED(context);
   VCL_UNUSED(index);
@@ -831,7 +867,8 @@ MethodStatus Object::GetIndex(Context* context, const Value& index,
       type_name());
 }
 
-MethodStatus Object::SetIndex(Context* context, const Value& index,
+MethodStatus Object::SetIndex(Context* context,
+                              const Value& index,
                               const Value& value) {
   VCL_UNUSED(context);
   VCL_UNUSED(index);
@@ -852,8 +889,8 @@ MethodStatus Object::Invoke(Context* context, Value* output) {
 }
 
 #define DO(NAME, OP)                                                          \
-  MethodStatus Object::NAME(Context* context, const Value& value,             \
-                            Value* output) const {                            \
+  MethodStatus Object::NAME(                                                  \
+      Context* context, const Value& value, Value* output) const {            \
     VCL_UNUSED(context);                                                      \
     VCL_UNUSED(value);                                                        \
     VCL_UNUSED(output);                                                       \
@@ -898,8 +935,8 @@ MethodStatus Object::Unset(Context* context) {
 }
 
 #define DO(NAME, OP)                                                          \
-  MethodStatus Object::NAME(Context* context, const Value& value,             \
-                            bool* output) const {                             \
+  MethodStatus Object::NAME(                                                  \
+      Context* context, const Value& value, bool* output) const {             \
     VCL_UNUSED(context);                                                      \
     VCL_UNUSED(value);                                                        \
     VCL_UNUSED(output);                                                       \
@@ -917,7 +954,8 @@ DO(GreaterEqual, >=)
 
 #undef DO  // DO
 
-MethodStatus Object::Equal(Context* context, const Value& rhs,
+MethodStatus Object::Equal(Context* context,
+                           const Value& rhs,
                            bool* output) const {
   VCL_UNUSED(context);
   if (rhs.IsObject() && this == rhs.GetObject()) {
@@ -928,7 +966,8 @@ MethodStatus Object::Equal(Context* context, const Value& rhs,
   return MethodStatus::kOk;
 }
 
-MethodStatus Object::NotEqual(Context* context, const Value& rhs,
+MethodStatus Object::NotEqual(Context* context,
+                              const Value& rhs,
                               bool* output) const {
   VCL_UNUSED(context);
   if (rhs.IsObject() && this == rhs.GetObject()) {
@@ -939,7 +978,8 @@ MethodStatus Object::NotEqual(Context* context, const Value& rhs,
   return MethodStatus::kOk;
 }
 
-MethodStatus Object::Match(Context* context, const Value& value,
+MethodStatus Object::Match(Context* context,
+                           const Value& value,
                            bool* output) const {
   VCL_UNUSED(context);
   VCL_UNUSED(value);
@@ -950,7 +990,8 @@ MethodStatus Object::Match(Context* context, const Value& value,
       type_name());
 }
 
-MethodStatus Object::NotMatch(Context* context, const Value& value,
+MethodStatus Object::NotMatch(Context* context,
+                              const Value& value,
                               bool* output) const {
   VCL_UNUSED(context);
   VCL_UNUSED(value);
@@ -999,7 +1040,8 @@ MethodStatus Object::NewIterator(Context* context, Iterator** output) {
   VCL_UNUSED(output);
   return MethodStatus::NewUnimplemented(
       "NewIterator not implemented for type %s,",
-      "so no support for working with loop!", type_name());
+      "so no support for working with loop!",
+      type_name());
 }
 
 Object::~Object() {}
@@ -1008,7 +1050,8 @@ Object::~Object() {}
 // String Implementation
 // ========================================================================
 
-MethodStatus String::Add(Context* context, const Value& value,
+MethodStatus String::Add(Context* context,
+                         const Value& value,
                          Value* output) const {
   MethodStatus result;
   std::string temp;
@@ -1025,7 +1068,8 @@ MethodStatus String::SelfAdd(Context* context, const Value& value) {
   return MethodStatus::kOk;
 }
 
-MethodStatus String::Match(Context* context, const Value& value,
+MethodStatus String::Match(Context* context,
+                           const Value& value,
                            bool* output) const {
   MethodStatus result;
   if (value.IsString()) {
@@ -1043,8 +1087,10 @@ MethodStatus String::Match(Context* context, const Value& value,
 namespace {
 
 template <typename T>
-MethodStatus StringCompareOp(Context* context, const String& left,
-                             const Value& right, bool* output) {
+MethodStatus StringCompareOp(Context* context,
+                             const String& left,
+                             const Value& right,
+                             bool* output) {
   MethodStatus result;
   T handler;
   if (right.IsString()) {
@@ -1103,32 +1149,38 @@ struct StringNotEqualOp {
 
 }  // namespace
 
-MethodStatus String::Less(Context* context, const Value& value,
+MethodStatus String::Less(Context* context,
+                          const Value& value,
                           bool* output) const {
   return StringCompareOp<StringLessOp>(context, *this, value, output);
 }
 
-MethodStatus String::LessEqual(Context* context, const Value& value,
+MethodStatus String::LessEqual(Context* context,
+                               const Value& value,
                                bool* output) const {
   return StringCompareOp<StringLessEqualOp>(context, *this, value, output);
 }
 
-MethodStatus String::Greater(Context* context, const Value& value,
+MethodStatus String::Greater(Context* context,
+                             const Value& value,
                              bool* output) const {
   return StringCompareOp<StringGreaterOp>(context, *this, value, output);
 }
 
-MethodStatus String::GreaterEqual(Context* context, const Value& value,
+MethodStatus String::GreaterEqual(Context* context,
+                                  const Value& value,
                                   bool* output) const {
   return StringCompareOp<StringGreaterEqualOp>(context, *this, value, output);
 }
 
-MethodStatus String::Equal(Context* context, const Value& value,
+MethodStatus String::Equal(Context* context,
+                           const Value& value,
                            bool* output) const {
   return StringCompareOp<StringEqualOp>(context, *this, value, output);
 }
 
-MethodStatus String::NotEqual(Context* context, const Value& value,
+MethodStatus String::NotEqual(Context* context,
+                              const Value& value,
                               bool* output) const {
   return StringCompareOp<StringNotEqualOp>(context, *this, value, output);
 }
@@ -1145,8 +1197,10 @@ MethodStatus String::ToDisplay(Context* context, std::ostream* output) const {
   return MethodStatus::kOk;
 }
 
-MethodStatus String::Regex::Match(Context* context, const String& pattern,
-                                  const String& string, bool* output) {
+MethodStatus String::Regex::Match(Context* context,
+                                  const String& pattern,
+                                  const String& string,
+                                  bool* output) {
   MethodStatus result;
   if (!ctx) {
     if (!(result = Init(context, pattern))) return result;
@@ -1162,8 +1216,8 @@ MethodStatus String::Regex::Init(Context* context, const String& pattern) {
   int error_offset;
   ctx = pcre_compile(pattern.data(), 0, &error_str, &error_offset, NULL);
   if (!ctx)
-    return MethodStatus::NewFail("cannot compile pattern %s due to : %s",
-                                 pattern.data(), error_str);
+    return MethodStatus::NewFail(
+        "cannot compile pattern %s due to : %s", pattern.data(), error_str);
   extra = pcre_study(ctx, 0, &error_str);
   return MethodStatus::kOk;
 }
@@ -1176,7 +1230,8 @@ MethodStatus List::NewIterator(Context* context, Iterator** iterator) {
   return MethodStatus::kOk;
 }
 
-MethodStatus List::GetIndex(Context* context, const Value& index,
+MethodStatus List::GetIndex(Context* context,
+                            const Value& index,
                             Value* output) const {
   MethodStatus result;
   int32_t idx;
@@ -1188,7 +1243,8 @@ MethodStatus List::GetIndex(Context* context, const Value& index,
   return MethodStatus::kOk;
 }
 
-MethodStatus List::SetIndex(Context* context, const Value& index,
+MethodStatus List::SetIndex(Context* context,
+                            const Value& index,
                             const Value& value) {
   MethodStatus result;
   int32_t idx;
@@ -1224,7 +1280,8 @@ MethodStatus Dict::NewIterator(Context* context, ::vcl::Iterator** iterator) {
   return MethodStatus::kOk;
 }
 
-MethodStatus Dict::GetProperty(Context* context, const String& key,
+MethodStatus Dict::GetProperty(Context* context,
+                               const String& key,
                                Value* output) const {
   VCL_UNUSED(context);
   const Value* result = m_dict.Find(key);
@@ -1236,7 +1293,8 @@ MethodStatus Dict::GetProperty(Context* context, const String& key,
   }
 }
 
-MethodStatus Dict::SetProperty(Context* context, const String& key,
+MethodStatus Dict::SetProperty(Context* context,
+                               const String& key,
                                const Value& value) {
   VCL_UNUSED(context);
   if (m_dict.size() >= kMaximumDictSize) {
@@ -1250,7 +1308,8 @@ MethodStatus Dict::SetProperty(Context* context, const String& key,
   return MethodStatus::kOk;
 }
 
-MethodStatus Dict::GetIndex(Context* context, const Value& key,
+MethodStatus Dict::GetIndex(Context* context,
+                            const Value& key,
                             Value* output) const {
   std::string k;
   if (!key.ToString(context, &k)) {
@@ -1268,7 +1327,8 @@ MethodStatus Dict::GetIndex(Context* context, const Value& key,
   }
 }
 
-MethodStatus Dict::SetIndex(Context* context, const Value& key,
+MethodStatus Dict::SetIndex(Context* context,
+                            const Value& key,
                             const Value& value) {
   std::string k;
   if (!key.ToString(context, &k)) {
@@ -1310,7 +1370,8 @@ bool ACL::Match(const in6_addr& addr) const { return m_impl->Match(addr); }
 
 bool ACL::Match(const char* addr) const { return m_impl->Match(addr); }
 
-MethodStatus ACL::Match(Context* context, const Value& addr,
+MethodStatus ACL::Match(Context* context,
+                        const Value& addr,
                         Value* output) const {
   MethodStatus result;
   std::string temp;
@@ -1390,7 +1451,8 @@ MethodStatus Module::ToDisplay(Context* context, std::ostream* output) const {
   return MethodStatus::kOk;
 }
 
-MethodStatus Module::GetProperty(Context* context, const String& name,
+MethodStatus Module::GetProperty(Context* context,
+                                 const String& name,
                                  Value* output) const {
   VCL_UNUSED(context);
   if (FindProperty(name, output))
@@ -1534,7 +1596,8 @@ void GC::Dump(std::ostream* output) const {
 void ContextGC::Mark() {
   // Mark the root
   for (RootNodeList::iterator itr = m_root_list.begin();
-       itr != m_root_list.end(); ++itr) {
+       itr != m_root_list.end();
+       ++itr) {
     // Here we need to call DoMark instead of Mark function since
     // Mark doesn't take care of coloring and is used for user to
     // extend our GC capabilities.
@@ -1591,7 +1654,8 @@ MethodStatus Context::Invoke(SubRoutine* sub_routine, Value* output) {
   return m_runtime->FinishRun(sub_routine, output);
 }
 
-MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
+MethodStatus Context::Invoke(SubRoutine* sub_routine,
+                             const Value& a1,
                              Value* output) {
   DCHECK(sub_routine->argument_size() == 1);
   MethodStatus result;
@@ -1600,8 +1664,10 @@ MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
   return m_runtime->FinishRun(sub_routine, output);
 }
 
-MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
-                             const Value& a2, Value* output) {
+MethodStatus Context::Invoke(SubRoutine* sub_routine,
+                             const Value& a1,
+                             const Value& a2,
+                             Value* output) {
   DCHECK(sub_routine->argument_size() == 2);
   MethodStatus result;
   if (!(result = m_runtime->BeginRun(sub_routine))) return result;
@@ -1610,8 +1676,11 @@ MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
   return m_runtime->FinishRun(sub_routine, output);
 }
 
-MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
-                             const Value& a2, const Value& a3, Value* output) {
+MethodStatus Context::Invoke(SubRoutine* sub_routine,
+                             const Value& a1,
+                             const Value& a2,
+                             const Value& a3,
+                             Value* output) {
   DCHECK(sub_routine->argument_size() == 3);
   MethodStatus result;
   if (!(result = m_runtime->BeginRun(sub_routine))) return result;
@@ -1621,8 +1690,11 @@ MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
   return m_runtime->FinishRun(sub_routine, output);
 }
 
-MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
-                             const Value& a2, const Value& a3, const Value& a4,
+MethodStatus Context::Invoke(SubRoutine* sub_routine,
+                             const Value& a1,
+                             const Value& a2,
+                             const Value& a3,
+                             const Value& a4,
                              Value* output) {
   DCHECK(sub_routine->argument_size() == 4);
   MethodStatus result;
@@ -1634,9 +1706,13 @@ MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
   return m_runtime->FinishRun(sub_routine, output);
 }
 
-MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
-                             const Value& a2, const Value& a3, const Value& a4,
-                             const Value& a5, Value* output) {
+MethodStatus Context::Invoke(SubRoutine* sub_routine,
+                             const Value& a1,
+                             const Value& a2,
+                             const Value& a3,
+                             const Value& a4,
+                             const Value& a5,
+                             Value* output) {
   DCHECK(sub_routine->argument_size() == 5);
   MethodStatus result;
   if (!(result = m_runtime->BeginRun(sub_routine))) return result;
@@ -1648,9 +1724,14 @@ MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
   return m_runtime->FinishRun(sub_routine, output);
 }
 
-MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
-                             const Value& a2, const Value& a3, const Value& a4,
-                             const Value& a5, const Value& a6, Value* output) {
+MethodStatus Context::Invoke(SubRoutine* sub_routine,
+                             const Value& a1,
+                             const Value& a2,
+                             const Value& a3,
+                             const Value& a4,
+                             const Value& a5,
+                             const Value& a6,
+                             Value* output) {
   DCHECK(sub_routine->argument_size() == 6);
   MethodStatus result;
   if (!(result = m_runtime->BeginRun(sub_routine))) return result;
@@ -1663,9 +1744,14 @@ MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
   return m_runtime->FinishRun(sub_routine, output);
 }
 
-MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
-                             const Value& a2, const Value& a3, const Value& a4,
-                             const Value& a5, const Value& a6, const Value& a7,
+MethodStatus Context::Invoke(SubRoutine* sub_routine,
+                             const Value& a1,
+                             const Value& a2,
+                             const Value& a3,
+                             const Value& a4,
+                             const Value& a5,
+                             const Value& a6,
+                             const Value& a7,
                              Value* output) {
   DCHECK(sub_routine->argument_size() == 7);
   MethodStatus result;
@@ -1680,10 +1766,16 @@ MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
   return m_runtime->FinishRun(sub_routine, output);
 }
 
-MethodStatus Context::Invoke(SubRoutine* sub_routine, const Value& a1,
-                             const Value& a2, const Value& a3, const Value& a4,
-                             const Value& a5, const Value& a6, const Value& a7,
-                             const Value& a8, Value* output) {
+MethodStatus Context::Invoke(SubRoutine* sub_routine,
+                             const Value& a1,
+                             const Value& a2,
+                             const Value& a3,
+                             const Value& a4,
+                             const Value& a5,
+                             const Value& a6,
+                             const Value& a7,
+                             const Value& a8,
+                             Value* output) {
   DCHECK(sub_routine->argument_size() == 8);
   MethodStatus result;
   if (!(result = m_runtime->BeginRun(sub_routine))) return result;
@@ -1769,8 +1861,10 @@ boost::shared_ptr<CompiledCode> Engine::LoadFile(const std::string& filename,
 }
 
 boost::shared_ptr<CompiledCode> Engine::LoadString(
-    const std::string& filename, const std::string& source_code,
-    const ScriptOption& option, std::string* error) {
+    const std::string& filename,
+    const std::string& source_code,
+    const ScriptOption& option,
+    std::string* error) {
   boost::shared_ptr<CompiledCode> cc(new CompiledCode(this));
   SourceRepo source_repo(NULL, option.allow_loop);
   vm::CompilationUnit cu;
@@ -1783,9 +1877,13 @@ boost::shared_ptr<CompiledCode> Engine::LoadString(
 
   // 2. Generate compilation unit. This phase will do all include expansion
   // and load all required source code and parse them
-  if (!vm::CompilationUnit::Generate(&cu, cc.get(), &source_repo,
-                                     option.max_include, option.folder_hint,
-                                     option.allow_absolute_path, error)) {
+  if (!vm::CompilationUnit::Generate(&cu,
+                                     cc.get(),
+                                     &source_repo,
+                                     option.max_include,
+                                     option.folder_hint,
+                                     option.allow_absolute_path,
+                                     error)) {
     return boost::shared_ptr<CompiledCode>();
   }
 

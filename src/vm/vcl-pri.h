@@ -59,7 +59,8 @@ class SourceRepo {
 
  public:
   bool Initialize(const std::string& source_filename,
-                  const std::string& source_code, std::string* error);
+                  const std::string& source_code,
+                  std::string* error);
 
   SourceCode* GetEntry() {
     DCHECK(m_entry);

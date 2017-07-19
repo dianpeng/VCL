@@ -86,12 +86,17 @@ inline const T* VectorAsArray(const std::vector<T>& vec, size_t offset = 0) {
 // Code diagnostic information display ======================================
 std::string GetCodeSnippetHighlight(const std::string&, const CodeLocation&);
 
-std::string ReportErrorV(const std::string& source, const CodeLocation& loc,
-                         const char* module, const char* format, va_list);
+std::string ReportErrorV(const std::string& source,
+                         const CodeLocation& loc,
+                         const char* module,
+                         const char* format,
+                         va_list);
 
 inline std::string ReportError(const std::string& source,
-                               const CodeLocation& loc, const char* module,
-                               const char* format, ...) {
+                               const CodeLocation& loc,
+                               const char* module,
+                               const char* format,
+                               ...) {
   va_list vl;
   va_start(vl, format);
   return ReportErrorV(source, loc, module, format, vl);

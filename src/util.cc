@@ -16,8 +16,10 @@ namespace {
 const size_t kPrefixBufferLength = 256;
 const size_t kSourceCodeSnippetLength = 128;
 
-void FormatPrefix(const std::string& source, const CodeLocation& loc,
-                  const char* module, std::string* output) {
+void FormatPrefix(const std::string& source,
+                  const CodeLocation& loc,
+                  const char* module,
+                  std::string* output) {
   // 2. Get the location/coordinate that we can highlight the error place
   output->append(
       (boost::format(
@@ -94,8 +96,11 @@ std::string GetCodeSnippetHighlight(const std::string& source,
   return ret;
 }
 
-std::string ReportErrorV(const std::string& source, const CodeLocation& loc,
-                         const char* module, const char* format, va_list vl) {
+std::string ReportErrorV(const std::string& source,
+                         const CodeLocation& loc,
+                         const char* module,
+                         const char* format,
+                         va_list vl) {
   va_list backup;
   std::string output;
   char stk_buf[1024];

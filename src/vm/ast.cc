@@ -39,7 +39,8 @@ std::ostream& Serialize(const Include& inc, int indent, std::ostream* output) {
   return *output << "include " << '"' << (*(inc.path)) << "\";\n";
 }
 
-std::ostream& Serialize(const Import& import, int indent,
+std::ostream& Serialize(const Import& import,
+                        int indent,
                         std::ostream* output) {
   VCL_UNUSED(indent);
   return *output << "import " << '"' << (*(import.module_name)) << "\";\n";
@@ -54,7 +55,8 @@ std::ostream& Serialize(const Chunk& chunk, int indent, std::ostream* output) {
   return Indent(*output, indent) << "}\n";
 }
 
-std::ostream& Serialize(const LexScope& lscope, int indent,
+std::ostream& Serialize(const LexScope& lscope,
+                        int indent,
                         std::ostream* output) {
   return Serialize(*lscope.body, indent, output);
 }
@@ -72,7 +74,8 @@ std::ostream& Serialize(const Sub& sub, int indent, std::ostream* output) {
   return Serialize(*sub.body, indent, output);
 }
 
-std::ostream& Serialize(const ExtensionInitializer& ini, int indent,
+std::ostream& Serialize(const ExtensionInitializer& ini,
+                        int indent,
                         std::ostream* output) {
   *output << "{\n";
   for (size_t i = 0; i < ini.list.size(); ++i) {
@@ -83,13 +86,15 @@ std::ostream& Serialize(const ExtensionInitializer& ini, int indent,
   return Indent(*output, indent) << "}";
 }
 
-std::ostream& Serialize(const ExtensionLiteral& literal, int indent,
+std::ostream& Serialize(const ExtensionLiteral& literal,
+                        int indent,
                         std::ostream* output) {
   *output << (*literal.type_name) << ' ';
   return Serialize(*literal.initializer, indent, output);
 }
 
-std::ostream& Serialize(const Extension& ext, int indent,
+std::ostream& Serialize(const Extension& ext,
+                        int indent,
                         std::ostream* output) {
   Indent(*output, indent) << (*ext.type_name) << " " << (*ext.instance_name);
   return Serialize(*ext.initializer, indent, output) << '\n';
@@ -155,7 +160,8 @@ std::ostream& Serialize(const Terminate& t, int indent, std::ostream* output) {
   return *output << ");\n";
 }
 
-std::ostream& Serialize(const LeftHandSide& lhs, int indent,
+std::ostream& Serialize(const LeftHandSide& lhs,
+                        int indent,
                         std::ostream* output) {
   if (lhs.type == LeftHandSide::VARIABLE) {
     *output << *(lhs.variable);
@@ -188,7 +194,9 @@ std::ostream& Serialize(const Declare& d, int indent, std::ostream* output) {
   return *output;
 }
 
-std::ostream& Serialize(const char* prefix, const If::Branch& br, int indent,
+std::ostream& Serialize(const char* prefix,
+                        const If::Branch& br,
+                        int indent,
                         std::ostream* output) {
   Indent(*output, indent) << prefix << '(';
   Serialize(*br.condition, indent, output) << ")\n";
@@ -215,7 +223,8 @@ std::ostream& Serialize(const Break& node, int indent, std::ostream* output) {
   return Indent(*output, indent) << "break;\n";
 }
 
-std::ostream& Serialize(const Continue& node, int indent,
+std::ostream& Serialize(const Continue& node,
+                        int indent,
                         std::ostream* output) {
   return Indent(*output, indent) << "continue;\n";
 }
@@ -321,7 +330,8 @@ std::string Escape(const zone::ZoneString& str) {
   return buf;
 }
 
-std::ostream& Serialize(const StringConcat& sc, int indent,
+std::ostream& Serialize(const StringConcat& sc,
+                        int indent,
                         std::ostream* output) {
   VCL_UNUSED(indent);
   for (size_t i = 0; i < sc.list.size(); ++i) {
@@ -371,7 +381,8 @@ std::ostream& Serialize(const Size& s, int indent, std::ostream* output) {
   return *output << s.value;
 }
 
-std::ostream& Serialize(const StringInterpolation& node, int indent,
+std::ostream& Serialize(const StringInterpolation& node,
+                        int indent,
                         std::ostream* output) {
   Indent(*output, indent);
   for (size_t i = 0; i < node.list.size(); ++i) {
@@ -409,7 +420,8 @@ void ASTSerialize(const File& file, std::ostream* output) {
   Serialize(file, 0, output);
 }
 
-Declare* NewTempVariableDeclare(zone::Zone* zone, zone::ZoneString* name,
+Declare* NewTempVariableDeclare(zone::Zone* zone,
+                                zone::ZoneString* name,
                                 Prefix* expr,
                                 const vcl::util::CodeLocation& loc) {
   Declare* ret = new (zone) Declare(loc);

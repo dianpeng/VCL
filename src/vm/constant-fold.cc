@@ -655,7 +655,8 @@ ast::AST* ConstantFolder::Fold(ast::Ternary* node, FoldResult* result) {
   }
 }
 
-ast::AST* ConstantFolder::Fold(ast::AST* node, zone::Zone* zone,
+ast::AST* ConstantFolder::Fold(ast::AST* node,
+                               zone::Zone* zone,
                                std::string* error) {
   m_zone = zone;
   m_error = error;

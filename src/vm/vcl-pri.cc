@@ -37,8 +37,11 @@ bool SourceRepo::Initialize(const std::string& source_code_name,
   vcl::util::scoped_ptr<SourceCode> pu(new SourceCode());
   pu->source_code_info->file_path = source_code_name;
   pu->source_code_info->source_code = source_code;
-  Parser parser(&m_zone, pu->source_code_info->file_path,
-                pu->source_code_info->source_code, error, m_rand_name_seed,
+  Parser parser(&m_zone,
+                pu->source_code_info->file_path,
+                pu->source_code_info->source_code,
+                error,
+                m_rand_name_seed,
                 m_allow_loop);
   if (!(pu->root = parser.DoParse())) {
     return false;
@@ -74,8 +77,12 @@ SourceCode* SourceRepo::FindOrLoadSourceCode(const std::string& file_path,
     }
 
     {  // Do the parsing
-      Parser parser(&m_zone, file_path, pu->source_code_info->source_code,
-                    error, m_rand_name_seed, m_allow_loop);
+      Parser parser(&m_zone,
+                    file_path,
+                    pu->source_code_info->source_code,
+                    error,
+                    m_rand_name_seed,
+                    m_allow_loop);
       if (!(pu->root = parser.DoParse())) {
         return NULL;
       }
@@ -91,9 +98,10 @@ SourceCode* SourceRepo::FindOrLoadSourceCode(const std::string& file_path,
 vm::Procedure* CompiledCodeBuilder::CreateSubRoutine(const vm::ast::Sub& sub,
                                                      uint32_t* index) {
   DCHECK(GetSubRoutineIndex(sub.sub_name) == -1);
-  m_cc->m_sub_routine_list.push_back(new vm::Procedure(
-      sub.sub_name ? sub.sub_name->ToStdString() : "",
-      vm::ast::Sub::FormatProtocol(sub), sub.arg_list.size()));
+  m_cc->m_sub_routine_list.push_back(
+      new vm::Procedure(sub.sub_name ? sub.sub_name->ToStdString() : "",
+                        vm::ast::Sub::FormatProtocol(sub),
+                        sub.arg_list.size()));
   if (index)
     *index = static_cast<uint32_t>(m_cc->m_sub_routine_list.size() - 1);
   return &(m_cc->m_sub_routine_list.back());

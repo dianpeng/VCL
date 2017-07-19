@@ -177,7 +177,8 @@ class FunctionPrintln : public Function {
             return MethodStatus::NewFail(
                 "function::println argument %zu with type %s "
                 "cannot be printed, doesn't support ToString!",
-                (i + 1), v.type_name());
+                (i + 1),
+                v.type_name());
           }
           break;
         }
@@ -211,7 +212,8 @@ class FunctionMin : public Function {
           return MethodStatus::NewFail(
               "function::min %zu argument with type %s,"
               "cannot be compared with others!",
-              (i + 1), v.type_name());
+              (i + 1),
+              v.type_name());
         }
       }
       *output = current;
@@ -242,7 +244,8 @@ class FunctionMax : public Function {
           return MethodStatus::NewFail(
               "function::max %zu argument with type %s,"
               "cannot be compared with others!",
-              (i + 1), v.type_name());
+              (i + 1),
+              v.type_name());
         }
       }
       *output = current;
@@ -360,8 +363,8 @@ class FunctionLoop : public Function {
               "be integer");
         }
         Handle<Loop> itr(
-            context->gc()->New<Loop>(start.GetInteger(), end.GetInteger(),
-                                     step.GetInteger()),
+            context->gc()->New<Loop>(
+                start.GetInteger(), end.GetInteger(), step.GetInteger()),
             context->gc());
         if (!itr->Check()) {
           return MethodStatus::NewFail(
@@ -669,7 +672,8 @@ class ListJoin : public Function {
               "function::list.join the %zuth element "
               "in list with type %s doesn't support "
               "Add operation with other elements!",
-              (i + 1), v.type_name());
+              (i + 1),
+              v.type_name());
         }
       }
       *output = current;
@@ -735,8 +739,8 @@ class FunctionGCSize : public Function {
     if (context->GetArgumentSize() != 0) {
       return MethodStatus::NewFail("function::gc.gc_size requires 0 argument");
     }
-    Value::CastSizeToValueNoLostPrecision(context, context->gc()->gc_size(),
-                                          output);
+    Value::CastSizeToValueNoLostPrecision(
+        context, context->gc()->gc_size(), output);
     return MethodStatus::kOk;
   }
 };
@@ -763,8 +767,8 @@ class FunctionGCTimes : public Function {
       return MethodStatus::NewFail("function::gc.gc_times requires 0 argument");
     }
     output->SetInteger(static_cast<int32_t>(context->gc()->gc_times()));
-    Value::CastSizeToValueNoLostPrecision(context, context->gc()->gc_times(),
-                                          output);
+    Value::CastSizeToValueNoLostPrecision(
+        context, context->gc()->gc_times(), output);
     return MethodStatus::kOk;
   }
 };

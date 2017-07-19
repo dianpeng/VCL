@@ -589,9 +589,14 @@ class Value VCL_FINAL {
   Object* object() const { return boost::get<Object*>(m_value); }
 
  private:
-  boost::variant<Object*, int32_t, double, bool, vcl::util::Duration,
+  boost::variant<Object*,
+                 int32_t,
+                 double,
+                 bool,
+                 vcl::util::Duration,
                  vcl::util::Size>
       m_value;
+
   ValueType m_type;
 };
 
@@ -647,7 +652,8 @@ class Object {
 
   // Property Operations
   virtual MethodStatus GetProperty(Context*, const String& key, Value*) const;
-  virtual MethodStatus SetProperty(Context*, const String& key,
+  virtual MethodStatus SetProperty(Context*,
+                                   const String& key,
                                    const Value& value);
 
   virtual MethodStatus GetAttribute(Context*, const String& key, Value*) const;
@@ -809,7 +815,8 @@ class String VCL_FINAL : public Object {
   virtual MethodStatus SelfAdd(Context*, const Value&);
 
   virtual MethodStatus Match(Context*, const Value&, bool*) const;
-  virtual MethodStatus NotMatch(Context* context, const Value& value,
+  virtual MethodStatus NotMatch(Context* context,
+                                const Value& value,
                                 bool* output) const {
     bool result = true;
     MethodStatus ret = !Match(context, value, &result);
@@ -1236,11 +1243,13 @@ class Dict VCL_FINAL : public Object {
   virtual MethodStatus SetIndex(Context*, const Value&, const Value&);
 
   // Attribute
-  virtual MethodStatus GetAttribute(Context* context, const String& key,
+  virtual MethodStatus GetAttribute(Context* context,
+                                    const String& key,
                                     Value* output) const {
     return GetProperty(context, key, output);
   }
-  virtual MethodStatus SetAttribute(Context* context, const String& key,
+  virtual MethodStatus SetAttribute(Context* context,
+                                    const String& key,
                                     const Value& value) {
     return SetProperty(context, key, value);
   }
@@ -1386,7 +1395,8 @@ class ACLBuilder {
   // Add a specific ip-address pattern into the ACL
   bool AddPattern(const std::string& ip_address, bool negative);
   // Add a classical varnish VCL style address pattern into ACL
-  bool AddAddress(const std::string& ip_address, bool negative,
+  bool AddAddress(const std::string& ip_address,
+                  bool negative,
                   uint32_t mask = 0);
   bool AddAddress(const in_addr&, bool negative, uint32_t mask = 0);
   bool AddAddress(const in6_addr&, bool negative, uint32_t mask = 0);
@@ -1617,7 +1627,8 @@ class GC {
 #endif  // VCL_MINIMUM_GC_GAP
       ;
 
-  GC(size_t next_gc_trigger, double gc_ratio,
+  GC(size_t next_gc_trigger,
+     double gc_ratio,
      const size_t minimum_gc_gap = kMinimumGCGap)
       : m_gc_start(NULL),
         m_gc_size(0),
@@ -1717,34 +1728,71 @@ class GC {
     return LinkObject<T>(::new (Malloc(sizeof(T))) T(a1, a2, a3, a4));
   }
 
-  template <typename T, typename A1, typename A2, typename A3, typename A4,
+  template <typename T,
+            typename A1,
+            typename A2,
+            typename A3,
+            typename A4,
             typename A5>
   T* New(const A1& a1, const A2& a2, const A3& a3, const A4& a4, const A5& a5) {
     BOOST_STATIC_ASSERT(boost::is_base_of<Object, T>::value);
     return LinkObject<T>(::new (Malloc(sizeof(T))) T(a1, a2, a3, a4, a5));
   }
 
-  template <typename T, typename A1, typename A2, typename A3, typename A4,
-            typename A5, typename A6>
-  T* New(const A1& a1, const A2& a2, const A3& a3, const A4& a4, const A5& a5,
+  template <typename T,
+            typename A1,
+            typename A2,
+            typename A3,
+            typename A4,
+            typename A5,
+            typename A6>
+  T* New(const A1& a1,
+         const A2& a2,
+         const A3& a3,
+         const A4& a4,
+         const A5& a5,
          const A6& a6) {
     BOOST_STATIC_ASSERT(boost::is_base_of<Object, T>::value);
     return LinkObject<T>(::new (Malloc(sizeof(T))) T(a1, a2, a3, a4, a5, a6));
   }
 
-  template <typename T, typename A1, typename A2, typename A3, typename A4,
-            typename A5, typename A6, typename A7>
-  T* New(const A1& a1, const A2& a2, const A3& a3, const A4& a4, const A5& a5,
-         const A6& a6, const A7& a7) {
+  template <typename T,
+            typename A1,
+            typename A2,
+            typename A3,
+            typename A4,
+            typename A5,
+            typename A6,
+            typename A7>
+  T* New(const A1& a1,
+         const A2& a2,
+         const A3& a3,
+         const A4& a4,
+         const A5& a5,
+         const A6& a6,
+         const A7& a7) {
     BOOST_STATIC_ASSERT(boost::is_base_of<Object, T>::value);
     return LinkObject<T>(::new (Malloc(sizeof(T)))
                              T(a1, a2, a3, a4, a5, a6, a7));
   }
 
-  template <typename T, typename A1, typename A2, typename A3, typename A4,
-            typename A5, typename A6, typename A7, typename A8>
-  T* New(const A1& a1, const A2& a2, const A3& a3, const A4& a4, const A5& a5,
-         const A6& a6, const A7& a7, const A8& a8) {
+  template <typename T,
+            typename A1,
+            typename A2,
+            typename A3,
+            typename A4,
+            typename A5,
+            typename A6,
+            typename A7,
+            typename A8>
+  T* New(const A1& a1,
+         const A2& a2,
+         const A3& a3,
+         const A4& a4,
+         const A5& a5,
+         const A6& a6,
+         const A7& a7,
+         const A8& a8) {
     BOOST_STATIC_ASSERT(boost::is_base_of<Object, T>::value);
     return LinkObject<T>(::new (Malloc(sizeof(T)))
                              T(a1, a2, a3, a4, a5, a6, a7, a8));
@@ -2156,25 +2204,53 @@ class Context VCL_FINAL : public detail::Environment<Context, ContextGC> {
 
   MethodStatus Invoke(SubRoutine*, const Value&, const Value&, Value*);
 
-  MethodStatus Invoke(SubRoutine*, const Value&, const Value&, const Value&,
+  MethodStatus Invoke(
+      SubRoutine*, const Value&, const Value&, const Value&, Value*);
+
+  MethodStatus Invoke(SubRoutine*,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
                       Value*);
 
-  MethodStatus Invoke(SubRoutine*, const Value&, const Value&, const Value&,
-                      const Value&, Value*);
-
-  MethodStatus Invoke(SubRoutine*, const Value&, const Value&, const Value&,
-                      const Value&, const Value&, Value*);
-
-  MethodStatus Invoke(SubRoutine*, const Value&, const Value&, const Value&,
-                      const Value&, const Value&, const Value&, Value*);
-
-  MethodStatus Invoke(SubRoutine*, const Value&, const Value&, const Value&,
-                      const Value&, const Value&, const Value&, const Value&,
+  MethodStatus Invoke(SubRoutine*,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
                       Value*);
 
-  MethodStatus Invoke(SubRoutine*, const Value&, const Value&, const Value&,
-                      const Value&, const Value&, const Value&, const Value&,
-                      const Value&, Value*);
+  MethodStatus Invoke(SubRoutine*,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      Value*);
+
+  MethodStatus Invoke(SubRoutine*,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      Value*);
+
+  MethodStatus Invoke(SubRoutine*,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      const Value&,
+                      Value*);
 
   // Get the argument size for the current function call
   size_t GetArgumentSize() const;
@@ -2546,7 +2622,8 @@ inline void Value::SetIterator(Iterator* value) {
 }
 
 inline void Value::CastSizeToValueNoLostPrecision(Context* context,
-                                                  size_t value, Value* output) {
+                                                  size_t value,
+                                                  Value* output) {
   if (value > static_cast<size_t>(std::numeric_limits<int32_t>::max())) {
     output->SetReal(static_cast<double>(value));
   } else {
@@ -2630,7 +2707,8 @@ bool StringDict<T, Hasher>::Insert(const String& string, const T& value) {
 
 template <typename T, typename Hasher>
 template <typename ALLOC>
-bool StringDict<T, Hasher>::Insert(ALLOC* gc, const char* string,
+bool StringDict<T, Hasher>::Insert(ALLOC* gc,
+                                   const char* string,
                                    const T& value) {
   Handle<String> key(gc->NewString(string), gc);
   return Insert(*key, value);
@@ -2638,7 +2716,8 @@ bool StringDict<T, Hasher>::Insert(ALLOC* gc, const char* string,
 
 template <typename T, typename Hasher>
 template <typename ALLOC>
-bool StringDict<T, Hasher>::Insert(ALLOC* gc, const std::string& string,
+bool StringDict<T, Hasher>::Insert(ALLOC* gc,
+                                   const std::string& string,
                                    const T& value) {
   return Insert(gc, string.c_str(), value);
 }
@@ -2659,7 +2738,8 @@ bool StringDict<T, Hasher>::Update(const String& string, const T& value) {
 
 template <typename T, typename Hasher>
 template <typename ALLOC>
-bool StringDict<T, Hasher>::Update(ALLOC* gc, const char* string,
+bool StringDict<T, Hasher>::Update(ALLOC* gc,
+                                   const char* string,
                                    const T& value) {
   uint32_t full_hash = HashKey(string, strlen(string));
 
@@ -2699,7 +2779,8 @@ void StringDict<T, Hasher>::InsertOrUpdate(const String& key, const T& value) {
 
 template <typename T, typename Hasher>
 template <typename ALLOC>
-void StringDict<T, Hasher>::InsertOrUpdate(ALLOC* gc, const char* string,
+void StringDict<T, Hasher>::InsertOrUpdate(ALLOC* gc,
+                                           const char* string,
                                            const T& value) {
   uint32_t full_hash = HashKey(string, strlen(string));
 

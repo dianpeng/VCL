@@ -130,8 +130,11 @@ bool _test(const char*);
 
 class Parser {
  public:
-  Parser(zone::Zone* zone, const std::string& file_path,
-         const std::string& source, std::string* error, int rand_name_ref = 0,
+  Parser(zone::Zone* zone,
+         const std::string& file_path,
+         const std::string& source,
+         std::string* error,
+         int rand_name_ref = 0,
          bool support_loop = true)
       : m_zone(zone),
         m_file_path(file_path),
