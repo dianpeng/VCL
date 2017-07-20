@@ -75,6 +75,13 @@ compilation-unit-test: $(SOURCE) $(INCLUDE) test/vm/compilation-unit-test.cc
 driver: $(SOURCE) $(INCLUDE) test/vm/driver.cc
 	$(CXX) $(PRODUCTIONFLAG) $(SOURCE) test/vm/driver.cc $(TESTLIB) -o driver
 
+# =========================================================================
+#
+# Transpiler
+#
+# =========================================================================
+template-unit-test: $(SOURCE) $(INCLUDE) test/vm/transpiler/template-test.cc
+	$(CXX) $(TESTFLAG) $(SOURCE) test/vm/transpiler/template-test.cc $(TESTLIB) -o template-test
 
 test/%.t : test/%.cc
 	$(CXX) $(SOURCE) $(TESTFLAG) -o $@ $< $(TESTLIB)
