@@ -845,13 +845,14 @@ ast::AST* Parser::ParseTernary() {
 }
 
 ast::AST* Parser::ParseExpression() {
-  std::string error;
-  ast::AST* ret = ConstantFold(ParseBinary(), m_zone, &error);
-  if (!ret) {
-    ParserError("%s", error.c_str());
-    return NULL;
-  } else
+  ast::AST* expr = ParseBinary();
+  if(!expr) return NULL;
+  else {
+    std::string error;
+    ast::AST* ret = ConstantFold(expr,m_zone,&error);
+    if(!ret) ParserError("%s",error.c_str());
     return ret;
+  }
 }
 
 const int kPrecedence[] = {
