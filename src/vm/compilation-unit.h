@@ -48,7 +48,16 @@ class CompilationUnit {
   // This list of Sub is used to represent all same name sub entry after
   // the expansion. And it means the code generator needs to concatenate
   // those sub into a large sub.
-  typedef std::vector<const ast::Sub*> SubList;
+  struct SubStatement {
+    const ast::Sub* sub;
+    uint32_t source_index;
+    SubStatement() : sub(NULL), source_index(0) {}
+    SubStatement( const ast::Sub* s , uint32_t si ):
+      sub(s) , source_index(si)
+    {}
+  };
+
+  typedef std::vector<SubStatement> SubList;
   typedef boost::shared_ptr<SubList> SubListPtr;
   typedef boost::variant<const ast::AST*, SubListPtr> CodeLine;
 

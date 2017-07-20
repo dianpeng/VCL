@@ -93,7 +93,7 @@ struct Options {
     empty_code               (-1),
     allow_module_inline      (false),
     inline_module_name       (),
-    runtime_namespace        ("vcl.runtime.")
+    runtime_namespace        ("vcl.runtime")
   {}
 };
 
@@ -101,8 +101,12 @@ struct Options {
 // Do the transpiling , convert the CompilationUnit to valid LUA code
 bool Transpile( const std::string& filename , const std::string& comment ,
                 const CompiledCode& cc , const CompilationUnit& ,
-                zone::Zone* , const Options& ,
-                std::string* , std::string* );
+                const Options& , std::string* , std::string* );
+
+}
+}
+}
+}
 
 
 #endif // TARGET_LUA51_H_

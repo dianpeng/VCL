@@ -21,7 +21,7 @@ class Template {
   // when it reaches a certain substitution key, instead of directly
   // emit string store in the Argument map , but call the callback
   // function Generate.
-  typedef boost::function< bool ( const std::string& , std::stirng* ) > Generator;
+  typedef boost::function< bool ( const std::string& , std::string* ) > Generator;
 
   // The value that gonna store inside of the key value map for later
   // rendering process and substituion

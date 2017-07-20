@@ -83,6 +83,9 @@ driver: $(SOURCE) $(INCLUDE) test/vm/driver.cc
 template-unit-test: $(SOURCE) $(INCLUDE) test/vm/transpiler/template-test.cc
 	$(CXX) $(TESTFLAG) $(SOURCE) test/vm/transpiler/template-test.cc $(TESTLIB) -o template-test
 
+lua51-unit-test: $(SOURCE) $(INCLUDE) test/vm/transpiler/target-lua51-test.cc
+	$(CXX) $(TESTFLAG) $(SOURCE) test/vm/transpiler/target-lua51-test.cc $(TESTLIB) -o lua51-test
+
 test/%.t : test/%.cc
 	$(CXX) $(SOURCE) $(TESTFLAG) -o $@ $< $(TESTLIB)
 

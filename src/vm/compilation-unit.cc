@@ -232,7 +232,7 @@ bool CompilationUnitBuilder::DoSub(const Sub& sub) {
       AddSub(std::string(sub.sub_name->data()));
   if (!sub_list->empty()) {
     // Check argument list to be identical ; otherwise report error
-    const Sub* another = sub_list->front();
+    const Sub* another = sub_list->front().sub;
     bool fail = false;
 
     for (size_t i = 0; i < another->arg_list.size(); ++i) {
@@ -258,7 +258,7 @@ bool CompilationUnitBuilder::DoSub(const Sub& sub) {
     }
   }
 
-  sub_list->push_back(&sub);
+  sub_list->push_back(CompilationUnit::SubStatement(&sub,m_cur_source_index));
   return true;
 }
 
@@ -273,7 +273,7 @@ void CompilationUnit::Serialize(std::ostream& output) {
       const SubListPtr& p = boost::get<SubListPtr>(stmt.code);
       const SubList& l = *p;
       for (size_t i = 0; i < l.size(); ++i) {
-        output << *l[i];
+        output << *l[i].sub;
       }
     }
   }

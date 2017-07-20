@@ -1234,7 +1234,14 @@ bool Compiler::Compile(const CompilationUnit::SubList& sub_list) {
   Procedure* prev_procedure = m_procedure;
 
   uint32_t index;
-  const ast::Sub& sub = *sub_list[0];
+
+  const CompilationUnit::SubStatement& ss = sub_list[0];
+  if(ss.source_index != m_cur_source_index) {
+    __ debug(ss.sub->location,ss.source_index);
+    m_cur_source_index = ss.source_index;
+  }
+
+  const ast::Sub& sub = *ss.sub;
   m_procedure = CompiledCodeBuilder(m_cc).CreateSubRoutine(sub, &index);
 
   {
@@ -1249,7 +1256,12 @@ bool Compiler::Compile(const CompilationUnit::SubList& sub_list) {
 
     // Generate all sub list's body
     for (size_t i = 0; i < sub_list.size(); ++i) {
-      const ast::Sub& s = *sub_list[i];
+      const CompilationUnit::SubStatement& ss = sub_list[i];
+      if(ss.source_index != m_cur_source_index) {
+        __ debug(ss.sub->location,ss.source_index);
+        m_cur_source_index = ss.source_index;
+      }
+      const ast::Sub& s = *ss.sub;
       DCHECK(*s.sub_name == *sub.sub_name);
       DCHECK(s.arg_list.size() == sub.arg_list.size());
       if (!Compile(s)) return false;
@@ -1262,7 +1274,7 @@ bool Compiler::Compile(const CompilationUnit::SubList& sub_list) {
   // which really means the location that points to the last statement
   // of last sub. Because we generate CompilationUnit as with the
   // same order when we meet each sub
-  const vcl::util::CodeLocation& loc = sub_list.back()->body->location_end;
+  const vcl::util::CodeLocation& loc = sub_list.back().sub->body->location_end;
   __ lnull(loc);
   __ ret(loc);
 

@@ -149,6 +149,8 @@ bool Template::Render( const std::string& text , Template::Argument& arg ,
       case TOKEN_TEXT:
         output->append(scanner.string());
         break;
+      case TOKEN_ERROR:
+        return false;
       default:
         VCL_UNREACHABLE();
         break;

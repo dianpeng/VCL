@@ -14,28 +14,65 @@ namespace {
 
 class Transpiler;
 
+static const char* kIndent = "  ";
+static const size_t kIndentSize = 2;
+
+std::string GetIndent( int indent ) {
+  std::string buffer;
+  buffer.reserve( kIndentSize * indent );
+  for( int i = 0 ; i < indent ; ++i ) {
+    buffer.append(kIndent);
+  }
+  return buffer;
+}
+
+
 class Comment {
  public:
-  inline Comment( std::string* , int indent );
-  Comment& Line(const std::string& path,const char* , ...) const;
-  Comment& Line(const char* , const vcl::util::CodeLocation& loc);
-  Comment& Line(const std::string& path,const vcl::util::CodeLocation& , const char* , ... );
-  Comment& Raw (const char* , ...) const;
+  Comment( std::string* output , int indent ):
+    m_output(output),
+    m_indent(indent)
+  {}
+
+  inline Comment& Line(const char* , ...) ;
+  inline Comment& Line(const std::string& path,const char* , const ::vcl::util::CodeLocation& );
+  inline Comment& Line(const std::string& path,const ::vcl::util::CodeLocation& , const char* , ... );
  private:
   std::string* m_output;
   int m_indent;
 };
 
-class Liner {
- public:
-  inline Liner( std::string* , int indent , const char* , ... );
-  inline Liner( std::string* , int indent );
-  Liner& Write(const char* , ...) const;
-  inline ~Liner();
- private:
-  std::string* m_output;
-  int m_indent;
-};
+inline Comment& Comment::Line(const char* format,...) {
+  va_list vl;
+  va_start(vl,format);
+  m_output->append(GetIndent(m_indent));
+  m_output->append("-- ");
+  m_output->append(::vcl::util::FormatV(format,vl));
+  m_output->push_back('\n');
+  return *this;
+}
+
+inline Comment& Comment::Line( const std::string& path , const ::vcl::util::CodeLocation& loc ,
+    const char* format , ... ) {
+  va_list vl;
+  va_start(vl,format);
+  return Line(path,::vcl::util::FormatV(format,vl).c_str(),loc);
+}
+
+inline Comment& Comment::Line( const std::string& path , const char* message,
+    const ::vcl::util::CodeLocation& loc ) {
+  m_output->append(GetIndent(m_indent));
+  m_output->append("-- ");
+  m_output->append("$vcl(message:\"");
+  m_output->append(message);
+  m_output->append(::vcl::util::Format("\";location=%zu,%zu,%zu;path=\"",
+                                         loc.line,
+                                         loc.position,
+                                         loc.ccount));
+  m_output->append(path);
+  m_output->append("\")\n");
+  return *this;
+}
 
 class Collection {
  public:
@@ -61,23 +98,23 @@ class Collection {
   const char* m_prefix;
 };
 
-void FormatAppend( std::string* buffer , const char* format , ... );
+inline void FormatAppend( std::string* buffer , const char* format , ... ) {
+  va_list vl;
+  va_start(vl,format);
+  buffer->append( ::vcl::util::FormatV(format,vl) );
+}
 
 class Transpiler {
  public:
-  Transpiler( zone::Zone* zone ,
-              const std::string& filename ,
+  Transpiler( const std::string& filename ,
               const std::string& comment ,
               const Options& opt ,
-              const CompilationUnit& cu ,
               const CompiledCode& cc,
               std::string* output ,
-              std::string* error )
-    : m_zone(zone),
+              std::string* error ) :
       m_filename(filename),
       m_comment(comment),
       m_opt(opt),
-      m_cu(cu),
       m_cc(cc),
       m_output(output),
       m_error(error),
@@ -85,11 +122,10 @@ class Transpiler {
       m_source_index()
   {}
 
-  bool DoTranspile();
+  bool DoTranspile( const CompilationUnit& cu );
 
  private: // Textual helper functions
-  void ReportError( const vcl::util::CodeLocation& , const char* , ... );
-  std::string GetIndent( int indent ) const;
+  void ReportError( const ::vcl::util::CodeLocation& , const char* , ... );
   void WriteLine( int indent , const char* , ... );
   void WriteTemplateLine( int indent , const char* , Template::Argument& argument );
 
@@ -107,26 +143,27 @@ class Transpiler {
                                      std::string* output ,
                                      const ast::ExtensionInitializer& node ,
                                      int indent );
-  Template::Generator NewFunctionPrototype( const std::string& key ,
-                                            std::string* output,
-                                            const ast::Sub& node,
-                                            int indent ) {
-    return boost::bind(&Transpiler::GenerateFunctionPrototype,this,_1,_2,node,indent);
+
+  Template::Generator NewFunctionPrototype( const ast::Sub& node, int indent ) {
+    return boost::bind(&Transpiler::GenerateFunctionPrototype,this,_1,_2,
+        boost::ref(node),indent);
   }
 
   Template::Generator NewFunctionArgGenerator( const ast::FuncCall& node , int indent ) {
-    return boost::bind(&Transpiler::GenerateFunctionArg,this,_1,_2,node,indent);
+    return boost::bind(&Transpiler::GenerateFunctionArg,this,_1,_2,
+        boost::ref(node),indent);
   }
 
   Template::Generator NewExtensionInitializerGenerator(
       const ast::ExtensionInitializer& node , int indent ) {
-    return boost::bind(&Transpiler::GenerateExntesionInitializer,this,_1,_2,node,indent);
+    return boost::bind(&Transpiler::GenerateExntesionInitializer,this,_1,_2,
+        boost::ref(node),indent);
   }
 
   std::string EscapeLuaString( const char* ) const;
 
   const std::string& CurrentSourceFile() const {
-    return m_cc.IndexSourceCodeInfo(m_source_index).file_path;
+    return m_cc.IndexSourceCodeInfo(m_source_index)->file_path;
   }
 
  private:
@@ -143,7 +180,6 @@ class Transpiler {
   bool Transpile( const ast::Global& , int indent );
   bool Transpile( const ast::Extension& , int indent );
   bool Transpile( const ast::Sub& , int indent );
-  bool TranspileAnonymousSub(const ast::Sub& , int indent );
 
   bool Transpile( const ast::Stmt& , int indent );
   bool Transpile( const ast::Declare& , int indent );
@@ -153,14 +189,17 @@ class Transpiler {
   bool Transpile( const ast::Terminate& , int indent );
   bool Transpile( const ast::If& , int indent );
   bool Transpile( const ast::LexScope& , int indent );
+  bool TranspileCallStatment( const ast::FuncCall&, int indent );
 
-  bool TranspileExpression( const ast::AST* , int indent , std::string* );
+  bool TranspileFuncCall( const ast::FuncCall& , int indent , std::string* );
+  bool TranspileExpression( const ast::AST& , int indent , std::string* );
   bool Transpile( const ast::ExtensionLiteral& , int indent , std::string* );
   bool Transpile( const ast::List& , int indent , std::string* );
   bool Transpile( const ast::Dict& , int indent , std::string* );
   bool Transpile( const ast::Size& , int indent , std::string* );
   bool Transpile( const ast::Duration& , int indent , std::string* );
   bool Transpile( const ast::String& , int indent , std::string* );
+  bool Transpile( const ast::Variable&, int indent , std::string* );
   bool Transpile( const ast::Null& , int indent , std::string* );
   bool Transpile( const ast::Boolean& , int indent , std::string* );
   bool Transpile( const ast::Integer& , int indent , std::string* );
@@ -172,34 +211,56 @@ class Transpiler {
   bool Transpile( const ast::Ternary& , int indent , std::string* );
   bool Transpile( const ast::Prefix&  , size_t target , int indent , std::string* );
 
-  // Misc
-  bool Transpile( const ast::FuncCall& node , int indent , std::string* );
-
  private:
-  zone::Zone* m_zone;
   const std::string& m_filename;
   const std::string& m_comment;
   const Options& m_opt;
-  const CompilationUnit& m_cu;
   const CompiledCode& m_cc;
   std::string* m_output;
   std::string* m_error;
   Template m_te;
 
-  int m_source_index;
+  uint32_t m_source_index;
 };
 
+void Transpiler::ReportError( const ::vcl::util::CodeLocation& loc ,
+    const char* format , ... ) {
+  va_list vlist;
+  va_start(vlist,format);
+  *m_error = ::vcl::util::ReportErrorV(
+      m_cc.IndexSourceCodeInfo(m_source_index)->source_code,
+      loc,
+      "[transpiler]",
+      format,
+      vlist);
+}
+
+void Transpiler::WriteLine( int indent , const char* format , ... ) {
+  va_list vl;
+  va_start(vl,format);
+  m_output->append(GetIndent(indent));
+  m_output->append(::vcl::util::FormatV(format,vl));
+  m_output->push_back('\n');
+}
+
+void Transpiler::WriteTemplateLine( int indent , const char* format ,
+    Template::Argument& arg ) {
+  m_output->append(GetIndent(indent));
+  CHECK( m_te.Render(format,arg,m_output) );
+  m_output->push_back('\n');
+}
 
 bool Transpiler::GenerateFunctionPrototype( const std::string& key ,
                                             std::string* output ,
                                             const ast::Sub& node ,
                                             int indent ) {
   VCL_UNUSED(key);
+  VCL_UNUSED(indent);
 
   std::string arg_buffer;
   Collection wrapper(output,NULL);
   for( size_t i = 0 ; i < node.arg_list.size() ; ++i ) {
-    wrapper.Add( node.arg_list.Index(i)->data() , (i < node.argument.size()-1) );
+    wrapper.Add( node.arg_list.Index(i)->data() , (i < node.arg_list.size()-1) );
   }
   return true;
 }
@@ -209,6 +270,8 @@ bool Transpiler::GenerateFunctionArg( const std::string& key ,
                                       const ast::FuncCall& node ,
                                       int indent ) {
   VCL_UNUSED(key);
+  VCL_UNUSED(indent);
+
   std::string arg_buffer;
   Collection wrapper(output,NULL);
 
@@ -226,14 +289,16 @@ bool Transpiler::GenerateExntesionInitializer( const std::string& key ,
                                                const ast::ExtensionInitializer& node ,
                                                int indent ) {
   VCL_UNUSED(key);
+  VCL_UNUSED(indent);
+
   std::string arg_buffer;
   Collection wrapper(output , "{" );
 
-  for( size_t i = 0 ; i < node.argument.size() ; ++i ) {
-    const ExtensionInitializer::ExtensionField& f = node.argument.Index(i);
+  for( size_t i = 0 ; i < node.list.size() ; ++i ) {
+    const ast::ExtensionInitializer::ExtensionField& f = node.list.Index(i);
     arg_buffer.clear();
     if(!TranspileExpression(*f.value,indent,&arg_buffer)) return false;
-    wrapper.Add(f.name->data(),arg_buffer,(i < node.argument.size()-1));
+    wrapper.Add(f.name->data(),arg_buffer,(i < node.list.size()-1));
   }
 
   return true;
@@ -273,6 +338,12 @@ void Transpiler::SetupHeader() {
   WriteLine(0,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.empty_code);
 }
 
+void Transpiler::SetupFooter() {
+  Comment comment(m_output,0);
+  comment.Line("**********************************************************************************")
+         .Line("******************** Generated by VCL transpiler *********************************")
+         .Line("**********************************************************************************");
+}
 
 /* -----------------------------------------------------------------------
  *
@@ -283,9 +354,9 @@ bool Transpiler::Transpile( const ast::ExtensionLiteral& node , int indent , std
   Template::Argument arg;
   arg["ns"] = Template::Str(m_opt.runtime_namespace);
   arg["name"] = Template::Str(node.type_name->data());
-  arg["arg"] = Template::Value(NewExtensionInitializerGenerator(node,indent));
+  arg["arg"] = Template::Value(NewExtensionInitializerGenerator(*node.initializer,indent));
 
-  CHECK( m_te.DoRender("${ns}.extension.${name}( ${arg} )",arg,output) );
+  CHECK( m_te.Render("${ns}.extension.${name}( ${arg} )",arg,output) );
   return true;
 }
 
@@ -294,7 +365,7 @@ bool Transpiler::Transpile( const ast::List& node , int indent , std::string* ou
   std::string arg_buffer;
   for( size_t i = 0 ; i < node.list.size() ; ++i ) {
     arg_buffer.clear();
-    if(!TranspileExpression(*node.list.Index(i),&arg_buffer,indent)) return false;
+    if(!TranspileExpression(*node.list.Index(i),indent,&arg_buffer)) return false;
 
     // We cannot use Lua's builtin array , but have to generate key value pair for Lua
     // to force it use 0 start index otherwise all the semantic gonna break. This is
@@ -306,7 +377,7 @@ bool Transpiler::Transpile( const ast::List& node , int indent , std::string* ou
     //   end
     //
     // ipairs will not work in this case
-    wrapper.Add(vcl::util::Format("[%zu]",i),arg_buffer,true);
+    wrapper.Add(::vcl::util::Format("[%zu]",i),arg_buffer,true);
   }
 
   // Add a tag into the table to show this is a list
@@ -331,7 +402,7 @@ bool Transpiler::Transpile( const ast::Dict& node , int indent , std::string* ou
 
     // Generate value
     arg_buffer.clear();
-    if(!TranspileExpression(*e.value,&arg_buffer)) return false;
+    if(!TranspileExpression(*e.value,indent,&arg_buffer)) return false;
     output->append(arg_buffer);
 
     if( i < node.list.size() - 1 ) output->push_back(',');
@@ -341,26 +412,30 @@ bool Transpiler::Transpile( const ast::Dict& node , int indent , std::string* ou
 }
 
 bool Transpiler::Transpile( const ast::Size& node , int indent , std::string* output ) {
+  VCL_UNUSED(indent);
+
   Template::Argument arg;
   arg["ns"] = Template::Str( m_opt.runtime_namespace );
-  arg["b"]  = Template::Str( vcl::util::Format("%d",node.value.b) );
-  arg["kb"] = Template::Str( vcl::util::Format("%d",node.value.kb) );
-  arg["mb"] = Template::Str( vcl::util::Format("%d",node.value.mb) );
-  arg["gb"] = Template::Str( vcl::util::Format("%d",node.value.gb) );
+  arg["b"]  = Template::Str( ::vcl::util::Format("%d",node.value.bytes) );
+  arg["kb"] = Template::Str( ::vcl::util::Format("%d",node.value.kilobytes) );
+  arg["mb"] = Template::Str( ::vcl::util::Format("%d",node.value.megabytes) );
+  arg["gb"] = Template::Str( ::vcl::util::Format("%d",node.value.gigabytes) );
 
-  CHECK( m_te.DoRender("%{ns}.new_size({b=${b},kb=${kb},mb=${mb},gb=${gb}})",arg,output) );
+  CHECK( m_te.Render("%{ns}.new_size({b=${b},kb=${kb},mb=${mb},gb=${gb}})",arg,output) );
   return true;
 }
 
 bool Transpiler::Transpile( const ast::Duration& node , int indent , std::string* output ) {
+  VCL_UNUSED(indent);
+
   Template::Argument arg;
   arg["ns"] = Template::Str( m_opt.runtime_namespace );
-  arg["hour"]= Template::Str( vcl::util::Format("%d",node.value.hour) );
-  arg["minute"] = Template::Str( vcl::util::Format("%d",node.value.minute) );
-  arg["second"] = Template::Str( vcl::util::Format("%d",node.value.second) );
-  arg["millisecond"] = Template::Str( vcl::util::Format("%d",node.value.millisecond) );
+  arg["hour"]= Template::Str( ::vcl::util::Format("%d",node.value.hour) );
+  arg["minute"] = Template::Str( ::vcl::util::Format("%d",node.value.minute) );
+  arg["second"] = Template::Str( ::vcl::util::Format("%d",node.value.second) );
+  arg["millisecond"] = Template::Str( ::vcl::util::Format("%d",node.value.millisecond) );
 
-  CHECK( m_te.DoRender("%{ns}.new_duration({"
+  CHECK( m_te.Render("%{ns}.new_duration({"
                        "hour=${hour},"
                        "minute=${minute},"
                        "second=${second},"
@@ -376,8 +451,16 @@ bool Transpiler::Transpile( const ast::String& node , int indent , std::string* 
   return true;
 }
 
+bool Transpiler::Transpile( const ast::Variable& node , int indent , std::string* output ) {
+  VCL_UNUSED(indent);
+  output->append( node.value->data() );
+  return true;
+}
+
 bool Transpiler::Transpile( const ast::Null& node , int indent , std::string* output ) {
   VCL_UNUSED(indent);
+  VCL_UNUSED(node);
+
   output->append("nil");
   return true;
 }
@@ -390,13 +473,13 @@ bool Transpiler::Transpile( const ast::Boolean& node , int indent , std::string*
 
 bool Transpiler::Transpile( const ast::Integer& node , int indent , std::string* output ) {
   VCL_UNUSED(indent);
-  output->append( vcl::util::Format( "%d", node.value ) );
+  output->append( ::vcl::util::Format( "%d", node.value ) );
   return true;
 }
 
 bool Transpiler::Transpile( const ast::Real& node , int indent , std::string* output ) {
   VCL_UNUSED(indent);
-  output->append( vcl::util::Format( "%f", node.value ) );
+  output->append( ::vcl::util::Format( "%f", node.value ) );
   return true;
 }
 
@@ -410,18 +493,18 @@ bool Transpiler::Transpile( const ast::StringInterpolation& node, int indent , s
   //
   // In Lua the simplest way is to use a table and then call table.concate
 
-  output->push_back("table.concate({");
+  output->append("table.concate({");
 
   for( size_t i = 0 ; i < node.list.size() ; ++i ) {
     output->append("tostring(");
     arg_buffer.clear();
-    if(!Transpile(*node.list.Index(i),indent,&arg_buffer)) return false;
+    if(!TranspileExpression(*node.list.Index(i),indent,&arg_buffer)) return false;
     output->append(arg_buffer);
     output->push_back(')');
-    if(i < node.list.sizez()-1) output->append(",");
+    if(i < node.list.size()-1) output->append(",");
   }
 
-  output->push_back("},\"\")");
+  output->append("},\"\")");
 
   return true;
 }
@@ -470,15 +553,15 @@ bool Transpiler::Transpile( const ast::Unary& node , int indent , std::string* o
     }
   }
 
-  if(!Transpile(*node.operand,indent,output)) return false;
+  if(!TranspileExpression(*node.operand,indent,output)) return false;
   return true;
 }
 
 bool Transpiler::Transpile( const ast::Binary& node , int indent , std::string* output ) {
   if(node.op == TK_MATCH || node.op == TK_NOT_MATCH) {
     std::string lhs_buffer , rhs_buffer;
-    if(!Transpile(*node.lhs,indent,&lhs_buffer) ||
-       !Transpile(*node.rhs,indent,&rhs_buffer))
+    if(!TranspileExpression(*node.lhs,indent,&lhs_buffer) ||
+       !TranspileExpression(*node.rhs,indent,&rhs_buffer))
       return false;
 
     if(node.op == TK_MATCH) {
@@ -495,17 +578,16 @@ bool Transpiler::Transpile( const ast::Binary& node , int indent , std::string* 
     // operator '+' as a function call and inside of the function to simulate that
     // polymorphic add.
     std::string lhs_buffer , rhs_buffer;
-    if(!Transpile(*node.lhs,indent,&lhs_buffer) ||
-       !Transpile(*node.rhs,indent,&rhs_buffer))
+    if(!TranspileExpression(*node.lhs,indent,&lhs_buffer) ||
+       !TranspileExpression(*node.rhs,indent,&rhs_buffer))
       return false;
 
     FormatAppend(output,"%s.add(%s,%s)",m_opt.runtime_namespace.c_str(),
                                         lhs_buffer.c_str(),
                                         rhs_buffer.c_str());
   } else {
-    std::string arg_buffer;
     output->push_back('(');
-    if(!Transpile(*node.lhs,indent,&arg_buffer)) return false;
+    if(!TranspileExpression(*node.lhs,indent,output)) return false;
     switch(node.op) {
       case TK_SUB: output->push_back('-'); break;
       case TK_MUL: output->push_back('*'); break;
@@ -515,24 +597,24 @@ bool Transpiler::Transpile( const ast::Binary& node , int indent , std::string* 
       case TK_LE:  output->append("<=")  ; break;
       case TK_GT:  output->push_back('>'); break;
       case TK_GE:  output->append(">=");   break;
-      case TK_EQ:  output->appned("==");   break;
+      case TK_EQ:  output->append("==");   break;
       case TK_NE:  output->append("!=");   break;
       default: VCL_UNREACHABLE(); break;
     }
 
-    if(!Transpile(*node.rhs,indent,&arg_buffer)) return false;
-    arg_buffer.push_back(')');
+    if(!TranspileExpression(*node.rhs,indent,output)) return false;
+    output->push_back(')');
   }
   return true;
 }
 
 bool Transpiler::Transpile( const ast::Ternary& node , int indent , std::string* output ) {
   output->push_back('(');
-  if(!Transpile(*node.condition,indent,output)) return false;
+  if(!TranspileExpression(*node.condition,indent,output)) return false;
   output->append(" and ");
-  if(!Transpile(*node.first,indent,output)) return false;
+  if(!TranspileExpression(*node.first,indent,output)) return false;
   output->append(" or ");
-  if(!Transpile(*node.second,indent,output)) return false;
+  if(!TranspileExpression(*node.second,indent,output)) return false;
   output->push_back(')');
   return true;
 }
@@ -547,15 +629,15 @@ bool Transpiler::Transpile( const ast::Prefix& node , size_t target , int indent
     const ast::Prefix::Component& n = node.list.Index(i);
     switch(n.tag) {
       case ast::Prefix::Component::CALL:
-        if(!Transpile(*n.funcall,indent,&output)) return false;
+        if(!TranspileFuncCall(*n.funccall,indent,&temp)) return false;
         break;
       case ast::Prefix::Component::INDEX:
         temp.push_back('[');
-        if(!Transpile(*n.expression,indent,&output)) return false;
+        if(!TranspileExpression(*n.expression,indent,&temp)) return false;
         temp.push_back(']');
         break;
       case ast::Prefix::Component::DOT:
-        temp.push_back('.');
+        if( i > 0 ) temp.push_back('.');
         temp.append(n.var->data());
         break;
       case ast::Prefix::Component::ATTRIBUTE:
@@ -586,7 +668,7 @@ bool Transpiler::TranspileExpression( const ast::AST& expr , int indent , std::s
     case ast::AST_PREFIX:
       return Transpile( static_cast<const ast::Prefix&>(expr), 0 , indent, output );
     case ast::AST_FUNCCALL:
-      return Transpile( static_cast<const ast::FuncCall&>(expr), indent, output );
+      return TranspileFuncCall( static_cast<const ast::FuncCall&>(expr), indent, output );
     case ast::AST_EXTENSION_LITERAL:
       return Transpile( static_cast<const ast::ExtensionLiteral&>(expr), indent, output );
     case ast::AST_DICT:
@@ -613,6 +695,9 @@ bool Transpiler::TranspileExpression( const ast::AST& expr , int indent , std::s
       return Transpile( static_cast<const ast::Size&>(expr), indent, output);
     case ast::AST_STRING_INTERPOLATION:
       return Transpile( static_cast<const ast::StringInterpolation&>(expr), indent, output);
+    case ast::AST_SUB:
+      ReportError(expr.location,"Anonymous function is not supported currently in transpiler!");
+      return false;
     default:
       VCL_UNREACHABLE();
       return false;
@@ -634,7 +719,7 @@ bool Transpiler::Transpile( const ast::Declare& node , int indent ) {
   comment.Line(CurrentSourceFile(),"declare",node.location);
 
   std::string buffer;
-  if(!Transpile(*node.rhs,indent,&buffer)) return false;
+  if(!TranspileExpression(*node.rhs,indent,&buffer)) return false;
   WriteLine( indent , "local %s = %s" , node.variable->data(), buffer.c_str() );
   return true;
 }
@@ -644,15 +729,15 @@ bool Transpiler::Transpile( const ast::Set& node , int indent ) {
   comment.Line(CurrentSourceFile(),"set",node.location);
 
   std::string buffer;
-  if(!Transpile(*node.rhs,indent,&buffer)) return false;
+  if(!TranspileExpression(*node.rhs,indent,&buffer)) return false;
 
   if( node.lhs.type == ast::LeftHandSide::VARIABLE ) {
     WriteLine( indent , "%s = %s", node.lhs.variable->data(),
                                    buffer.c_str());
   } else {
-    std::buffer object;
+    std::string object;
 
-    const ast::Prefix::Component& last_comp = node.lhs.prefix->Last();
+    const ast::Prefix::Component& last_comp = node.lhs.prefix->list.Last();
 
     // Check if we need to use set_attr to set the last attribute
     if( last_comp.tag == ast::Prefix::Component::ATTRIBUTE ) {
@@ -695,17 +780,17 @@ bool Transpiler::Transpile( const ast::Unset& node , int indent ) {
     arg["lb"] = Template::Str("\n");
     arg["obj"]= Template::Str(node.lhs.variable->data());
 
-    CHECK( m_te.DoRender( "${i1}if type(${obj}) == \"string\" then${lb}"
+    CHECK( m_te.Render( "${i1}if type(${obj}) == \"string\" then${lb}"
                           "${i2}${obj} = nil${lb}"
-                          "${il}elseif type(${obj}) == \"number\" then${lb}"
-                          "${i2)${obj} = 0${lb}"
-                          "${il}elseif tpye(${obj}) == \"boolean\" then${lb}"
-                          "{$i2}${obj} = false${lb}"
+                          "${i1}elseif type(${obj}) == \"number\" then${lb}"
+                          "${i2}${obj} = 0${lb}"
+                          "${i1}elseif tpye(${obj}) == \"boolean\" then${lb}"
+                          "${i2}${obj} = false${lb}"
                           "${i1}else${lb}"
                           "${i2}${obj} = nil${lb}"
                           "${i1}end${lb}" , arg, m_output) );
   } else {
-    const ast::Prefix::Component& last_comp = node.lhs.prefix->Last();
+    const ast::Prefix::Component& last_comp = node.lhs.prefix->list.Last();
     std::string buffer;
 
     if(!Transpile(*node.lhs.prefix,node.lhs.prefix->list.size()-1,indent,&buffer))
@@ -720,7 +805,7 @@ bool Transpiler::Transpile( const ast::Unset& node , int indent ) {
       case ast::Prefix::Component::INDEX:
         {
           std::string expr;
-          if(!Transpile(*last_comp.expression,indent,&expr))
+          if(!TranspileExpression(*last_comp.expression,indent,&expr))
             return false;
           WriteLine(indent,"%s.unset_prop(%s,%s)",m_opt.runtime_namespace.c_str(),
                                                   buffer.c_str(),
@@ -746,11 +831,13 @@ bool Transpiler::Transpile( const ast::Return& node , int indent ) {
 
   m_output->append( GetIndent(indent) );
   m_output->append( "return ");
-  if(!ret.value) {
+  if(!node.value) {
     m_output->append("nil");
     return true;
   } else {
-    return TranspileExpression(*ret.value,indent,m_output);
+    if(!TranspileExpression(*node.value,indent,m_output)) return false;
+    m_output->push_back('\n');
+    return true;
   }
 }
 
@@ -760,40 +847,40 @@ bool Transpiler::Transpile( const ast::Terminate& node, int indent ) {
 
   switch(node.action) {
     case ACT_OK:
-      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code,m_opt.ok_code);
+      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.ok_code);
       break;
     case ACT_FAIL:
-      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code,m_opt.fail_code);
+      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.fail_code);
       break;
     case ACT_PIPE:
-      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code,m_opt.pipe_code);
+      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.pipe_code);
       break;
     case ACT_HASH:
-      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code,m_opt.hash_code);
+      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.hash_code);
       break;
     case ACT_PURGE:
-      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code,m_opt.purge_code);
+      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.purge_code);
       break;
     case ACT_LOOKUP:
-      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code,m_opt.lookup_code);
+      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.lookup_code);
       break;
     case ACT_RESTART:
-      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code,m_opt.restart_code);
+      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.restart_code);
       break;
     case ACT_FETCH:
-      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code,m_opt.fetch_code);
+      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.fetch_code);
       break;
     case ACT_MISS:
-      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code,m_opt.miss_code);
+      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.miss_code);
       break;
     case ACT_DELIVER:
-      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code,m_opt.deliver_code);
+      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.deliver_code);
       break;
     case ACT_RETRY:
-      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code,m_opt.retry_code);
+      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.retry_code);
       break;
     case ACT_ABANDON:
-      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code,m_opt.abandon_code);
+      WriteLine(indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.abandon_code);
       break;
     default:
       ReportError(node.location,"Unsupport terminated return!");
@@ -867,7 +954,7 @@ bool Transpiler::Transpile( const ast::Global& node , int indent ) {
   comment.Line(CurrentSourceFile(),"global",node.location);
 
   std::string buffer;
-  if(!TranspileExpression(*node.value,&buffer))
+  if(!TranspileExpression(*node.value,indent,&buffer))
     return false;
 
   WriteLine(indent,"%s = %s",node.name->data(),buffer.c_str());
@@ -881,29 +968,15 @@ bool Transpiler::Transpile( const ast::Extension& node, int indent ) {
   Template::Argument arg;
   arg["ns"] = Template::Str(m_opt.runtime_namespace);
   arg["name"] = Template::Str(node.type_name->data());
-  arg["arg"] = Template::Value(NewExtensionInitializerGenerator(node,indent));
-  arg["obj"] = Template::Value(node.instance_name->data());
+  arg["arg"] = Template::Value(NewExtensionInitializerGenerator(
+        *node.initializer,indent));
+  arg["obj"] = Template::Str(node.instance_name->data());
   WriteTemplateLine(indent,"${obj} = ${ns}.extension.${name}(${arg})",arg);
   return true;
 }
 
 bool Transpiler::Transpile( const ast::Sub& node , int indent ) {
-  return Transpile(*node.body,indent);
-}
-
-bool Transpiler::TranspileAnonymousSub( const ast::Sub& node , int indent ) {
-  Comment comment(m_output,indent);
-  comment.Line(CurrentSourceFile(),"anonymous_sub",node.location);
-
-  {
-    Template::Argument arg;
-    arg["arg"] = Template::Value( NewFunctionPrototype(node,indent) );
-    WriteTemplateLine(indent,"function(${arg})",arg);
-  }
-
-  if(!TranspileChunk(*node.body,indent+1)) return false;
-  WriteLinde(indent,"end");
-  return true;
+  return TranspileChunk(*node.body,indent);
 }
 
 
@@ -923,12 +996,16 @@ bool Transpiler::Transpile( const ast::AST& node , int indent ) {
       return Transpile( static_cast<const ast::If&>(node) , indent);
     case ast::AST_STMT:
       return Transpile( static_cast<const ast::Stmt&>(node), indent);
+    case ast::AST_FUNCCALL:
+      return TranspileCallStatment(static_cast<const ast::FuncCall&>(node),indent);
     case ast::AST_IMPORT:
       return Transpile( static_cast<const ast::Import&>(node), indent);
     case ast::AST_EXTENSION:
-      return Transpile( static_cast<const ast::Exntesion&>(node), indent);
+      return Transpile( static_cast<const ast::Extension&>(node), indent);
     case ast::AST_GLOBAL:
       return Transpile( static_cast<const ast::Global&>(node),indent);
+    case ast::AST_LEXSCOPE:
+      return Transpile( static_cast<const ast::LexScope&>(node), indent);
     default:
       ReportError(node.location,"Statement: %s doesn't support in transpilation!",
                                 GetASTName( node.type ));
@@ -948,40 +1025,110 @@ bool Transpiler::TranspileChunk( const ast::Chunk& node , int indent ) {
   return true;
 }
 
-bool Transpiler::Transpile( const ast::CompilationUnit::SubList& node ) {
-  Comment comment(m_output,indent);
-  comment.Line(CurrentSourceFile(),node.location,"sub(%s)",
-                                                 node.front()->sub_name->data());
+bool Transpiler::Transpile( const CompilationUnit::SubList& node ) {
+  Comment comment(m_output,0);
+  comment.Line(CurrentSourceFile(),node.front().sub->location,
+                                   "sub(%s)",
+                                   node.front().sub->sub_name->data());
 
   // Generate sub's argument list
   {
     Template::Argument arg;
-    arg["arg"] = Template::Value( NewFunctionPrototype(*node.front(),0) );
-    arg["name"]= Template::Value( node.front()->sub_name()->data() );
+    arg["arg"] = Template::Value( NewFunctionPrototype(*node.front().sub,0) );
+    arg["name"]= Template::Str( node.front().sub->sub_name->data() );
     WriteTemplateLine(0,"function ${name}(${arg})",arg);
   }
 
-  // Generate body of each 
+  // Generate body of each sub
+  {
+    for( size_t i = 0 ; i < node.size() ; ++i ) {
+      const CompilationUnit::SubStatement& ss = node[i];
+      if( m_source_index != ss.source_index ) {
+        m_source_index = ss.source_index;
+      }
+
+      Comment comment(m_output,0);
+      comment.Line(CurrentSourceFile(),ss.sub->location,"sub(%s)",
+                                                        node.front().sub->sub_name->data());
+
+      WriteLine(1,"do");
+      if(!Transpile(*ss.sub,2)) return false;
+      WriteLine(1,"end");
+    }
+  }
+
+  // Generate the end of the function
+  WriteLine(0,"end");
+  return true;
 }
 
+bool Transpiler::Transpile( const CompilationUnit& cu ) {
+  if(!cu.empty()) {
+    m_source_index = cu.Index(0).source_index;
+    for( size_t i = 0 ; i < cu.size() ; ++i ) {
+      const CompilationUnit::Statement& stmt = cu.Index(i);
+      if(m_source_index != stmt.source_index) {
+        m_source_index = stmt.source_index;
+      }
 
+      switch(stmt.code.which()) {
+        case CompilationUnit::STMT_AST:
+          if(!Transpile(*boost::get<const ast::AST*>(stmt.code),0))
+            return false;
+          break;
+        case CompilationUnit::STMT_SUBLIST:
+          if(!Transpile(*boost::get<CompilationUnit::SubListPtr>(stmt.code)))
+            return false;
+          break;
+        default: VCL_UNREACHABLE(); break;
+      }
+    }
+  }
+  return true;
+}
 
+bool Transpiler::TranspileFuncCall( const ast::FuncCall& node , int indent ,
+    std::string* output ) {
+  // Transpile function call as a normal call expression but not as a statment
+  // basically do not consider indent in such case
+  Template::Argument arg;
+  arg["arg"] = Template::Value( NewFunctionArgGenerator(node,indent) );
+  if(node.name) {
+    arg["name"]= Template::Str( node.name->data() );
+    CHECK( m_te.Render("${name}(${arg})",arg,output) );
+  } else {
+    CHECK( m_te.Render("(${arg})",arg,output) );
+  }
+  return true;
+}
 
+bool Transpiler::TranspileCallStatment( const ast::FuncCall& node , int indent ) {
+  Comment comment(m_output,indent);
+  comment.Line(CurrentSourceFile(),node.location,"call(%s)",node.name->data());
 
+  Template::Argument arg;
+  arg["arg"] = Template::Value( NewFunctionArgGenerator(node,indent) );
+  arg["name"]= Template::Str(node.name->data());
+  WriteTemplateLine(indent,"${name}(${arg})",arg);
+  return true;
+}
 
-
-
-
-
-
-
-
-
-
-
-
+bool Transpiler::DoTranspile( const CompilationUnit& cu ) {
+  SetupHeader();
+  if(!Transpile(cu)) return false;
+  SetupFooter();
+  return true;
+}
 
 } // namespace
+
+bool Transpile( const std::string& filename , const std::string& comment ,
+                const CompiledCode& cc , const CompilationUnit& cu,
+                const Options& option, std::string* output , std::string* error ) {
+  Transpiler instance(filename,comment,option,cc,output,error);
+  return instance.DoTranspile(cu);
+}
+
 
 } // namespace lua51
 } // namespace transpiler
