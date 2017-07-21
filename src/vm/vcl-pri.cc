@@ -42,7 +42,8 @@ bool SourceRepo::Initialize(const std::string& source_code_name,
                 pu->source_code_info->source_code,
                 error,
                 m_rand_name_seed,
-                m_allow_loop);
+                m_allow_loop,
+                m_allow_desugar);
   if (!(pu->root = parser.DoParse())) {
     return false;
   }
@@ -82,7 +83,8 @@ SourceCode* SourceRepo::FindOrLoadSourceCode(const std::string& file_path,
                     pu->source_code_info->source_code,
                     error,
                     m_rand_name_seed,
-                    m_allow_loop);
+                    m_allow_loop,
+                    m_allow_desugar);
       if (!(pu->root = parser.DoParse())) {
         return NULL;
       }

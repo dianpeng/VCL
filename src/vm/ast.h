@@ -383,7 +383,10 @@ struct Prefix : public AST {
   Prefix(const vcl::util::CodeLocation& loc) : AST(loc, AST_PREFIX), list() {}
 
   struct Component {
-    enum { CALL = 0, INDEX, DOT, ATTRIBUTE };
+    // MCall is used when desugar is turned off in the parser. It is basically
+    // used only by the transpiler since the transpiler may be able to directly
+    // translate method call into the target language.
+    enum { CALL = 0, INDEX, DOT, ATTRIBUTE , MCALL };
     int tag;
     union {
       FuncCall* funccall;
@@ -391,7 +394,7 @@ struct Prefix : public AST {
       zone::ZoneString* var;
     };
 
-    Component(FuncCall* fc) : tag(CALL), funccall(fc) {}
+    Component(FuncCall* fc , int t = CALL) : tag(t), funccall(fc) {}
 
     Component(AST* expr) : tag(INDEX), expression(expr) {}
 
@@ -417,7 +420,7 @@ struct Stmt : public AST {
 };
 
 struct FuncCall : public AST {
-  FuncCall(const vcl::util::CodeLocation& loc, bool m = false)
+  FuncCall(const vcl::util::CodeLocation& loc)
       : AST(loc, AST_FUNCCALL), name(NULL), argument() {}
 
   zone::ZoneString* name;

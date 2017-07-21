@@ -334,7 +334,6 @@ sub fib(a) {
 }
 
 sub test {
-  declare start = time.now_in_micro_seconds();
   assert( fib(4) == 5 , "fib(4) == 5");
   test_dict;
   test_builtin;
@@ -344,5 +343,4 @@ sub test {
   test_global;
   test_list;
   do_gc();
-  declare end = time.now_in_micro_seconds();
 }

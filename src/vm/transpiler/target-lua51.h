@@ -1,22 +1,21 @@
 #ifndef TARGET_LUA51_H_
 #define TARGET_LUA51_H_
-
+#include <vcl/vcl.h>
 #include <string>
 
-#include "../ast.h"
-#include "../zone.h"
-#include "../compilation-unit.h"
-#include "../vcl-pri.h"
-
-
 namespace vcl {
+class CompiledCode;
 namespace vm  {
+class CompilationUnit;
 namespace transpiler {
 namespace lua51 {
 
 // Transpiler options
 
 struct Options {
+  // Script comment
+  std::string comment;
+
   // Temporary variable prefix
   std::string temporary_variable_prefix;
 
@@ -24,6 +23,8 @@ struct Options {
   std::string vcl_main_coroutine;
   std::string vcl_terminate_code;
   std::string vcl_type_name;
+  std::string vcl_add_function_name;
+  bool allow_builtin_add;
 
   // Support action return
   bool allow_terminate_return;
@@ -71,12 +72,20 @@ struct Options {
   std::string runtime_namespace;
 
 
+  // Creation function for creating a Options object from the TranspilerOptionTable
+  static bool Create( const ::vcl::experiment::TranspilerOptionTable& , Options* ,
+                                                                        std::string* );
+
+ public:
   Options():
-    temporary_variable_prefix("__VCL_temp_"),
+    comment                  (),
+    temporary_variable_prefix("__VCL_temp__"),
     vcl_main                 ("__VCL_main__"),
     vcl_main_coroutine       ("__VCL_main_coroutine__"),
     vcl_terminate_code       ("__VCL_terminate_code__"),
     vcl_type_name            ("__VCL_type__"),
+    vcl_add_function_name    ("__VCL_builtin_add__"),
+    allow_builtin_add        (true),
     allow_terminate_return   (true),
     ok_code                  (0),
     fail_code                (1),
@@ -99,14 +108,14 @@ struct Options {
 
 
 // Do the transpiling , convert the CompilationUnit to valid LUA code
-bool Transpile( const std::string& filename , const std::string& comment ,
-                const CompiledCode& cc , const CompilationUnit& ,
-                const Options& , std::string* , std::string* );
+bool Transpile( const std::string& filename , const CompiledCode& cc ,
+                const CompilationUnit& , const Options& ,
+                std::string* , std::string* );
 
-}
-}
-}
-}
+} // namespace lua51
+} // namespace transpiler
+} // namespace vm
+} // namespace vcl
 
 
 #endif // TARGET_LUA51_H_

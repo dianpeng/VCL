@@ -2335,10 +2335,8 @@ class Engine VCL_FINAL : public detail::Environment<Engine, ImmutableGC> {
   VCL_DISALLOW_COPY_AND_ASSIGN(Engine);
 };
 
-// =========================================================================
 // Initialization APIs
 // Call this API before using any VCL library classes or APIs
-// =========================================================================
 void InitVCL(const char* process_path, double vcl_version_tag = 4.0);
 
 // Check VCL Version is correct or not. Use InitVCL to setup VCL version.
@@ -2346,9 +2344,104 @@ void InitVCL(const char* process_path, double vcl_version_tag = 4.0);
 // equal check and we don't support multiple version in current implementation.
 bool CheckVCLVersion(double version);
 
-// =========================================================================
-// Inline APIs definition
-// =========================================================================
+
+namespace experiment {
+
+/* Following APIs and classes are used to transpile VCL into different other
+ * target language. Its main purpose is to ease the pain of maintaining different
+ * virtual machines , potentially on edge or other types of cluster. The main
+ * reason of implemeting Lua5.1 as target is because many CDN company are already
+ * using Lua inside of their server so it is relatively easy to drop a VCL implementation
+ * on top of a existed Lua5.1 virtual machine */
+
+struct TranspilerOptionValue {
+  boost::variant< int , double , bool , std::string > value;
+  enum { INTEGER , REAL , BOOLEAN , STRING };
+
+  TranspilerOptionValue( int v ):
+    value(v)
+  {}
+
+  TranspilerOptionValue( double v ):
+    value(v)
+  {}
+
+  TranspilerOptionValue( bool v ):
+    value(v)
+  {}
+
+  TranspilerOptionValue( const std::string& v ):
+    value(v)
+  {}
+
+  inline bool Get( int* ) const;
+  inline bool Get( double* ) const;
+  inline bool Get( bool* ) const;
+  inline bool Get( std::string* ) const;
+};
+
+inline bool TranspilerOptionValue::Get( int* output ) const {
+  if( value.which() != INTEGER ) {
+    return false;
+  } else {
+    *output = boost::get<int>(value);
+    return true;
+  }
+}
+
+inline bool TranspilerOptionValue::Get( double* output ) const {
+  if( value.which() != REAL ) {
+    return false;
+  } else {
+    *output = boost::get<double>(value);
+    return true;
+  }
+}
+
+inline bool TranspilerOptionValue::Get( bool* output ) const {
+  if( value.which() != BOOLEAN ) {
+    return false;
+  } else {
+    *output = boost::get<bool>(value);
+    return true;
+  }
+}
+
+inline bool TranspilerOptionValue::Get( std::string* output ) const {
+  if( value.which() != STRING ) {
+    return false;
+  } else {
+    *output = boost::get<std::string>(value);
+    return true;
+  }
+}
+
+typedef std::map<std::string,TranspilerOptionValue> TranspilerOptionTable;
+
+enum TranspilerTarget {
+  TARGET_LUA51 ,
+  SIZE_OF_TRANSPILER_TARGET
+};
+
+bool TranspileFile( const std::string& ,const TranspilerOptionTable& ,
+                                        const ScriptOption& ,
+                                        TranspilerTarget ,
+                                        std::string* ,
+                                        std::string* );
+
+bool TranspileString( const std::string& , const std::string& , const TranspilerOptionTable& ,
+                                                                const ScriptOption& ,
+                                                                TranspilerTarget ,
+                                                                std::string* ,
+                                                                std::string* );
+
+}  // namespace experiment
+
+/* --------------------------------------------------------------------------
+ *
+ * Inline APIs Definition
+ *
+ * -------------------------------------------------------------------------*/
 inline const char* MethodStatus::status_name() const {
   switch (status()) {
     case METHOD_OK:

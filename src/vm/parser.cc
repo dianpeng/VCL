@@ -37,14 +37,14 @@ void Parser::ParserError(const char* format, ...) {
 
 zone::ZoneString* Parser::GetAnonymousSubName(zone::Zone* zone) const {
   std::stringstream formatter;
-  formatter << "__anonymous_sub__" << m_rand_name_seed << "@";
+  formatter << '@' << "__anonymous_sub__::" << m_rand_name_seed;
   ++m_rand_name_seed;
   return zone::ZoneString::New(zone, formatter.str());
 }
 
 zone::ZoneString* Parser::GetTempVariableName(zone::Zone* zone) const {
   std::stringstream formatter;
-  formatter << "__temp_variable__" << m_rand_name_seed << "@";
+  formatter << '@' << "__temp_variable__::" << m_rand_name_seed;
   ++m_rand_name_seed;
   return zone::ZoneString::New(zone, formatter.str());
 }
@@ -675,7 +675,8 @@ bool Parser::ParseLHS(ast::LeftHandSide* output) {
     if (IsPrefixOperator(m_lexer.lexeme().token)) {
       ret = ParsePrefix(prefix, &last_component);
       if (!ret) return false;
-      if (last_component == ast::Prefix::Component::CALL) {
+      if (last_component == ast::Prefix::Component::CALL ||
+          last_component == ast::Prefix::Component::MCALL) {
         ParserError("Left hand side value cannot be a function call!");
         return false;
       }
@@ -697,7 +698,8 @@ ast::AST* Parser::ParsePrefixCall() {
   if (IsPrefixOperator(m_lexer.lexeme().token)) {
     ret = ParsePrefix(prefix, &last_component);
     if (!ret) return NULL;
-    if (last_component == ast::Prefix::Component::CALL) {
+    if (last_component == ast::Prefix::Component::CALL ||
+        last_component == ast::Prefix::Component::MCALL) {
       return new (m_zone) ast::Stmt(m_lexer.location(), ret);
     } else {
       ParserError("Expect a valid function call or othre statement here!");
@@ -788,7 +790,8 @@ ast::AST* Parser::ParseTerminate() {
       if (IsPrefixOperator(m_lexer.lexeme().token)) {
         int op = ast::Prefix::Component::DOT;
         if (!(terminate->value = ParsePrefix(prefix, &op))) return NULL;
-        if (op != ast::Prefix::Component::CALL) {
+        if (op != ast::Prefix::Component::CALL &&
+            op != ast::Prefix::Component::MCALL) {
           goto fail;
         }
       } else {
@@ -919,7 +922,7 @@ ast::AST* Parser::ParseBinary() {
 ast::AST* Parser::ParseUnary() {
   if (m_lexer.lexeme().token != TK_ADD && m_lexer.lexeme().token != TK_SUB &&
       m_lexer.lexeme().token != TK_NOT) {
-    return ParseAtomic();
+    return ParsePrimary();
   } else {
     ast::Unary* ret = new (m_zone) ast::Unary(m_lexer.location());
     Token token;
@@ -927,7 +930,7 @@ ast::AST* Parser::ParseUnary() {
       ret->ops.Add(m_zone, m_lexer.lexeme().token);
       token = m_lexer.Next().token;
     } while (token == TK_ADD || token == TK_SUB || token == TK_NOT);
-    ret->operand = ParseAtomic();
+    ret->operand = ParsePrimary();
     if (!ret->operand) return NULL;
     return ret;
   }
@@ -1085,68 +1088,91 @@ ast::Prefix* Parser::ParsePrefix(zone::ZoneString* prefix,
         if (last_component) *last_component = ast::Prefix::Component::CALL;
         break;
       case TK_FIELD: {
-        ast::AST* self;
-        // The grammar a::b(c) is actually a syntax sugar , however to
-        // make this syntax sugar has good semantic is kind of tricky.
-        // The core here is the evaluation a::b can be very nasty due
-        // to user could chain as much prefix expression as they like.
-        // Grammar like , a.b.c.d.e.f::g is allowed.
-        //
-        // What we actually do here is we setup a temporary assignment
-        // AST in current lexical scope and assign a.b.c.d.e.f to that
-        // temporary variable, so an expression a.b.c.d.e.f::g() is same
-        // as :
-        //  __temp = a.b.c.d.e.f;
-        //  __temp.g( __temp );
+        if(m_support_desugar) {
+          ast::AST* self;
+          // The grammar a::b(c) is actually a syntax sugar , however to
+          // make this syntax sugar has good semantic is kind of tricky.
+          // The core here is the evaluation a::b can be very nasty due
+          // to user could chain as much prefix expression as they like.
+          // Grammar like , a.b.c.d.e.f::g is allowed.
+          //
+          // What we actually do here is we setup a temporary assignment
+          // AST in current lexical scope and assign a.b.c.d.e.f to that
+          // temporary variable, so an expression a.b.c.d.e.f::g() is same
+          // as :
+          //  __temp = a.b.c.d.e.f;
+          //  __temp.g( __temp );
 
-        if (ret->list.size() == 1) {
-          // This is slightly a optimization to avoid too much local variables
-          // when user just do one level of lookup. Basically for cases as :
-          // a::b() , we will not create a temporary variable to avoid vm
-          // overhead.
-          DCHECK(ret->list[0].tag == ast::Prefix::Component::DOT);
-          self = new (m_zone)
-              ast::Variable(m_lexer.location(), ret->list.First().var);
-        } else {
-          zone::ZoneString* temp_name = GetTempVariableName(m_zone);
+          if (ret->list.size() == 1) {
+            // This is slightly a optimization to avoid too much local variables
+            // when user just do one level of lookup. Basically for cases as :
+            // a::b() , we will not create a temporary variable to avoid vm
+            // overhead.
+            DCHECK(ret->list[0].tag == ast::Prefix::Component::DOT);
+            self = new (m_zone)
+                ast::Variable(m_lexer.location(), ret->list.First().var);
+          } else {
+            zone::ZoneString* temp_name = GetTempVariableName(m_zone);
 
-          // 1. New temproary variable
-          DCHECK(m_lexical_scope);
-          m_lexical_scope->statement_list.Add(
+            // 1. New temproary variable
+            DCHECK(m_lexical_scope);
+            m_lexical_scope->statement_list.Add(
+                m_zone,
+                ast::NewTempVariableDeclare(
+                    m_zone, temp_name, ret, ret->location));
+
+            // 2. Create a new Prefix expression here to override the existed
+            // prefix expression
+            ret = new (m_zone) ast::Prefix(ret->location);
+            ret->list.Add(m_zone, ast::Prefix::Component(temp_name));
+
+            // 3. Create AST reference the temporary variable
+            self = new (m_zone) ast::Variable(m_lexer.location(), temp_name);
+          }
+
+          // Generate rest of the method call AST
+          if (!m_lexer.Try(TK_VAR)) {
+            ParserError("Expect a variable name after \"::\" operation!");
+            return NULL;
+          }
+          ret->list.Add(
               m_zone,
-              ast::NewTempVariableDeclare(
-                  m_zone, temp_name, ret, ret->location));
+              ast::Prefix::Component(
+                  zone::ZoneString::New(m_zone, m_lexer.lexeme().string()),
+                  ast::Prefix::Component::DOT));
+          if (!m_lexer.Try(TK_LPAR)) {
+            ParserError(
+                "Expect function call argument list in method call "
+                "operation!");
+            return NULL;
+          }
 
-          // 2. Create a new Prefix expression here to override the existed
-          // prefix expression
-          ret = new (m_zone) ast::Prefix(ret->location);
-          ret->list.Add(m_zone, ast::Prefix::Component(temp_name));
+          ast::FuncCall* mc = ParseMethodCall(self);
+          ret->list.Add(m_zone, mc);
 
-          // 3. Create AST reference the temporary variable
-          self = new (m_zone) ast::Variable(m_lexer.location(), temp_name);
+          if (last_component) *last_component = ast::Prefix::Component::CALL;
+        } else {
+          if(!m_lexer.Try(TK_VAR)) {
+            ParserError("Expect a variable name after \"::\" operation!");
+            return NULL;
+          }
+          ast::FuncCall* fc = new (m_zone) ast::FuncCall(m_lexer.location());
+          fc->name = zone::ZoneString::New(m_zone,m_lexer.lexeme().string());
+
+          if(!m_lexer.Try(TK_LPAR)) {
+            ParserError(
+                "Expect a function call agrument list in method call "
+                "operation!");
+            return NULL;
+          }
+
+          if(!ParseFuncCallArgument(fc)) return NULL;
+
+          ret->list.Add(m_zone, ast::Prefix::Component(
+                fc, ast::Prefix::Component::MCALL));
+
+          if(last_component) *last_component = ast::Prefix::Component::MCALL;
         }
-
-        // Generate rest of the method call AST
-        if (!m_lexer.Try(TK_VAR)) {
-          ParserError("Expect a variable name after \"::\" operation!");
-          return NULL;
-        }
-        ret->list.Add(
-            m_zone,
-            ast::Prefix::Component(
-                zone::ZoneString::New(m_zone, m_lexer.lexeme().string()),
-                ast::Prefix::Component::DOT));
-        if (!m_lexer.Try(TK_LPAR)) {
-          ParserError(
-              "Expect function call argument list in method call "
-              "operation!");
-          return NULL;
-        }
-
-        ast::FuncCall* mc = ParseMethodCall(self);
-        ret->list.Add(m_zone, mc);
-
-        if (last_component) *last_component = ast::Prefix::Component::CALL;
       } break;
       default:
         return ret;
@@ -1296,52 +1322,40 @@ ast::AST* Parser::ParsePrimary() {
       return ParseAnonymousSub();
     case TK_INTERP_START:
       return ParseStringInterpolation();
-    default:
-      return NULL;
-  }
-}
-
-ast::AST* Parser::ParseAtomic() {
-  ast::AST* primary = ParsePrimary();
-  if (primary)
-    return primary;
-  else {
-    switch (m_lexer.lexeme().token) {
-      case TK_VAR: {
-        zone::ZoneString* prefix =
-            zone::ZoneString::New(m_zone, m_lexer.lexeme().string());
-        Token token;
-        const vcl::util::CodeLocation loc = m_lexer.location();
-        token = m_lexer.Next().token;
-        if (IsPrefixOperator(token)) {
-          return ParsePrefix(prefix);
-        } else if (token == TK_LBRA) {
-          return ParseExtensionLiteral(prefix);
-        } else {
-          return new (m_zone) ast::Variable(loc, prefix);
-        }
+    case TK_VAR: {
+      zone::ZoneString* prefix =
+          zone::ZoneString::New(m_zone, m_lexer.lexeme().string());
+      Token token;
+      const vcl::util::CodeLocation loc = m_lexer.location();
+      token = m_lexer.Next().token;
+      if (IsPrefixOperator(token)) {
+        return ParsePrefix(prefix);
+      } else if (token == TK_LBRA) {
+        return ParseExtensionLiteral(prefix);
+      } else {
+        return new (m_zone) ast::Variable(loc, prefix);
       }
-      case TK_LSQR:
-        return ParseList();
-      case TK_LBRA:
-        return ParseDict();
-      case TK_LPAR: {
-        // Subexpression
-        m_lexer.Next();
-        ast::AST* ret = ParseExpression();
-        if (!ret) return NULL;
-        if (!m_lexer.Expect(TK_RPAR)) {
-          ParserError("Expect \")\" to close a subexpression!");
-          return NULL;
-        }
-        return ret;
-      }
-      default:
-        ParserError(
-            "unrecognize expression, expect a primary expression or a "
-            "variable prefixed expression!");
-        return NULL;
     }
+    case TK_LSQR:
+      return ParseList();
+    case TK_LBRA:
+      return ParseDict();
+    case TK_LPAR: {
+      // Subexpression
+      m_lexer.Next();
+      ast::AST* ret = ParseExpression();
+      if (!ret) return NULL;
+      if (!m_lexer.Expect(TK_RPAR)) {
+        ParserError("Expect \")\" to close a subexpression!");
+        return NULL;
+      }
+      return ret;
+    }
+    default:
+      ParserError(
+          "unrecognize expression, expect a primary expression or a "
+          "variable prefixed expression!");
+      return NULL;
   }
 }
 
@@ -1394,6 +1408,10 @@ ast::AST* Parser::ParseStringInterpolation() {
 
 done:
   return interp;
+}
+
+bool IsGeneratedVariableName( zone::ZoneString* name ) {
+  return (name->size() >0) && ((*name)[0] == '@');
 }
 
 }  // namespace vm

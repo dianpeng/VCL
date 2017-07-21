@@ -294,6 +294,17 @@ std::ostream& Serialize(const Prefix& p, int indent, std::ostream* output) {
       case Prefix::Component::ATTRIBUTE:
         *output << ':' << *c.var;
         break;
+      case Prefix::Component::MCALL:
+        {
+          *output << "::" << *c.funccall->name;
+          *output << '(';
+          for( size_t i = 0 ; i < c.funccall->argument.size(); ++i) {
+            Serialize(*c.funccall->argument[i],indent,output);
+            if(i < c.funccall->argument.size() -1) *output<<',';
+          }
+          *output << ')';
+        }
+        break;
       default:
         VCL_UNREACHABLE();
         break;

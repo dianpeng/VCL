@@ -11,6 +11,9 @@
 #include "vm/runtime.h"
 #include "vm/vcl-pri.h"
 
+// transpiler
+#include "vm/transpiler/target-lua51.h"
+
 #include "lib/builtin.h"
 
 namespace vcl {
@@ -1904,4 +1907,76 @@ void InitVCL(const char* process_path, double version) {
   google::InitGoogleLogging(process_path);
 }
 
+namespace experiment {
+
+bool TranspileString( const std::string& filename ,
+                      const std::string& data ,
+                      const TranspilerOptionTable& options ,
+                      const ScriptOption& vcl_options,
+                      TranspilerTarget target ,
+                      std::string* output ,
+                      std::string* error ) {
+  if(target != TARGET_LUA51) {
+    error->append("[transpiler]Unsupported target!");
+    return false;
+  }
+
+  switch( target ) {
+    case TARGET_LUA51:
+      {
+        vm::transpiler::lua51::Options opt;
+
+        // 0. Generate target language transpiler option object
+        if(!vm::transpiler::lua51::Options::Create(options, &opt, error))
+          return false;
+
+        Engine engine;
+        boost::shared_ptr<CompiledCode> cc(new CompiledCode(&engine));
+        SourceRepo source_repo(NULL, vcl_options.allow_loop,false);
+        vm::CompilationUnit cu;
+
+        // 1. Initialize source repo and load/parse the entry file
+        if(!source_repo.Initialize(filename,data,error))
+          return false;
+
+        // 2. Generate compilation unit and expand all the include
+        if(!vm::CompilationUnit::Generate(&cu,
+                                          cc.get(),
+                                          &source_repo,
+                                          vcl_options.max_include,
+                                          vcl_options.folder_hint,
+                                          vcl_options.allow_absolute_path,
+                                          error)) {
+          return false;
+        }
+
+        // 3. Do the transpilation
+        return Transpile( filename , *cc , cu , opt , output , error );
+      }
+    default:
+      VCL_UNREACHABLE();
+      break;
+  }
+
+  return true;
+}
+
+bool TranspileFile( const std::string& filename ,
+                    const TranspilerOptionTable& options,
+                    const ScriptOption& vcl_options,
+                    TranspilerTarget target,
+                    std::string* output,
+                    std::string* error ) {
+  std::string source_code;
+  if (!vcl::util::LoadFile(filename, &source_code)) {
+    error->assign("[transpiler]Cannot open source file!");
+    return false;
+  }
+  return TranspileString(filename,source_code,options,vcl_options,
+                                                      target,
+                                                      output,
+                                                      error);
+}
+
+}  // namespace experiment
 }  // namespace vcl

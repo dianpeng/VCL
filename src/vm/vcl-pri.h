@@ -47,13 +47,15 @@ class SourceRepo {
   typedef boost::ptr_map<std::string, SourceCode> SourceCodeTable;
 
  public:
-  SourceRepo(LoadFileInterface* interface = NULL, bool allow_loop = true)
+  SourceRepo(LoadFileInterface* interface = NULL, bool allow_loop = true,
+                                                  bool allow_desugar = true)
       : m_source_code_table(),
         m_entry(NULL),
         m_interface(interface),
         m_zone(),
         m_rand_name_seed(0),
-        m_allow_loop(allow_loop) {}
+        m_allow_loop(allow_loop),
+        m_allow_desugar(allow_desugar) {}
 
   ~SourceRepo() { delete m_interface; }
 
@@ -80,6 +82,7 @@ class SourceRepo {
   int m_rand_name_seed;  // Used for parser to generate random name for
                          // anonymous sub/function names
   bool m_allow_loop;     // Whether we allow loop
+  bool m_allow_desugar;  // For parser to desugar the method call or other stuff
 
   VCL_DISALLOW_COPY_AND_ASSIGN(SourceRepo);
 };
