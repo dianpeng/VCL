@@ -278,5 +278,10 @@ Example:
 3. Rich APIs for extending the runtime. The runtime knows nothing about the detail but simply works on top of a type system.
 
 
+### Transpiler
+
+Experimental transpiler is added which will generate Lua5.1 code from VCL
+
+
 # Detail
 TODO::
