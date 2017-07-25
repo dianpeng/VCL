@@ -38,21 +38,6 @@ sub t2 {
   declare xx = [1,2,3,4,5,6];
   declare sum = 0;
 
-  for( i , v : xx ) {
-    declare temp = 10;
-    declare uu = obj.a.b::c(200);
-    if(i % 2) {
-      new uu = 400;
-      assert( obj.a.b::c(100) == 200 );
-      set sum += v;
-      assert( uu == 400 );
-    } else if( i > 4 ) break;
-    assert( temp * 20 == 200 );
-    assert( uu == 300 );
-
-    declare xxx = 30;
-    assert( xxx == 30 );
-  }
 
   assert(sum == 12);
 }

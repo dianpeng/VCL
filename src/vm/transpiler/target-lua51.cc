@@ -30,6 +30,59 @@ static const size_t kIndentSize = 2;
 #endif // VCL_TRANSPILER_INDENT
 
 
+// Builtin variables or other stuff name
+static const char* kVCLVariablePrefix = "__vcl_builtin_";
+
+static const char* kVCLTypeName = "__vcl_builtin_Type";
+// static const char* kVCLMain = "__vcl_builtin_Main";
+// static const char* kVCLMainCoroutine = "__vcl_builtin_MainCoroutine";
+static const char* kVCLTerminateCode = "__vcl_builtion_TerminateCode";
+
+// Builtin functions
+static const char* kVCLBuiltinAdd = "__vcl_builtin_FunctionAdd";
+// static const char* kVCLBuiltinType= "__vcl_builtin_FunctionType";
+// static const char* kVCLBuiltinKeyExist= "__vcl_builtinFunctionKeyExist";
+
+// Lua builtin codes to make the code functioning
+//
+// We cannot use typical stringify macro trick in this case since pp doesn't
+// preserve newline so the code generated will be super mass to debug and
+// read with. We have to code it in string literal which is kind of sucky since
+// C++ , util 03 , doesn't have multiple line string literals.
+static const char* kBuiltinFunctions =
+  /* __vcl_builtin_FunctionType */
+  "local __vcl_builtin_FunctionLuaType = type\n" \
+  "function __vcl_builtin_FunctionType(a)\n"
+  "  local t = __vcl_builtin_FunctionLuaType(a)\n"
+  "  if (t == \"table\") then\n"
+  "    if (__vcl_builtin_FunctionKeyExist(a,\"__vcl_builtin_Type\")) and a.__vcl_builtin_Type == \"list\" then\n"
+  "      return \"list\"\n"
+  "    else\n"
+  "      return \"dict\"\n"
+  "    end\n"
+  "  end\n"
+  "  return t\n"
+  "end\n"
+  "local type = __vcl_builtin_FunctionType\n"
+  /* __vcl__builtin_FunctionAdd */
+  "function __vcl_builtin_FunctionAdd(a,b)\n"
+  "  return ((type(a) == \"string\" and type(b) == \"string\") and (a..b) or (a+b))\n"
+  "end\n"
+  /* __vcl_builtin_FunctionKeyExist */
+  "function __vcl_builtin_FunctionKeyExist(a,key)\n"
+  "  for k, _ in pairs(a) do\n"
+  "     if (k == key) then\n"
+  "       return true\n"
+  "     end\n"
+  "  end\n"
+  "  return false\n"
+  "end\n"
+  /* __vcl_builtin_FunctionPrintln */
+  "function __vcl_builtin_FunctionPrintln(...)\n"
+  "  print(unpack(arg))\n"
+  "end\n"
+  "local println = __vcl_builtin_FunctionPrintln\n";
+
 // The commented out keyword are keywords that are shared between Lua5.1 and VCL
 static const char* kLua51KeyWord[] = {
   "and",
@@ -110,8 +163,8 @@ inline Comment& Comment::Line( const std::string& path , const char* message,
   m_output->append(message);
   m_output->append(::vcl::util::Format("\";location=%zu,%zu,%zu;path=\"",
                                          loc.line,
-                                         loc.position,
-                                         loc.ccount));
+                                         loc.ccount,
+                                         loc.position));
   m_output->append(path);
   m_output->append("\")\n");
   return *this;
@@ -121,10 +174,17 @@ class Collection {
  public:
   inline Collection( std::string* output , const char* start , const char* end ):
     m_output(output),
-    m_end(end)
-  { if(start) m_output->append(start); }
+    m_end(end) {
+    if(start) {
+      m_output->append(start);
+    }
+  }
 
-  ~Collection() { if(m_end) m_output->append(m_end); }
+  ~Collection() {
+    if(m_end) {
+      m_output->append(m_end);
+    }
+  }
 
   void Add( const std::string& left , const std::string& right , bool comma ) const {
     m_output->append(left);
@@ -133,8 +193,12 @@ class Collection {
     if(comma) m_output->push_back(',');
   }
 
-  void Add( const std::string& value , bool comma ) const
-  { m_output->append(value); if(comma) m_output->push_back(','); }
+  void Add( const std::string& value , bool comma ) const {
+    m_output->append(value);
+    if(comma) {
+      m_output->push_back(',');
+    }
+  }
 
  private:
   std::string* m_output;
@@ -210,6 +274,15 @@ class Transpiler {
   }
 
   bool CheckIdentifierName( const vcl::util::CodeLocation& , zone::ZoneString* );
+  bool CheckLuaKeyword    ( zone::ZoneString* );
+  bool CheckLuaKeyword    ( const vcl::util::CodeLocation& loc , zone::ZoneString* id ) {
+    if(!CheckLuaKeyword(id)) {
+      ReportError(loc,"Identifier %s cannot be used since it is a valid Lua5.1 keyword!",
+                      id->data());
+      return false;
+    }
+    return true;
+  }
 
  private:
   // Initialization
@@ -313,25 +386,20 @@ void Transpiler::WriteTemplateLine( std::string* output , int indent ,
   output->push_back('\n');
 }
 
+bool Transpiler::CheckLuaKeyword( zone::ZoneString* name ) {
+  for( size_t i = 0 ; i < boost::size(kLua51KeyWord) ; ++i ) {
+    if(strcmp(name->data(),kLua51KeyWord[i])==0)
+      return false;
+  }
+  return true;
+}
+
 bool Transpiler::CheckIdentifierName( const vcl::util::CodeLocation& loc , zone::ZoneString* name ) {
   std::string n(name->ToStdString());
-  if(n.find(m_opt.temporary_variable_prefix) == 0)
+  if(n.find(kVCLVariablePrefix) == 0)
     goto fail;
 
-  if(n == m_opt.vcl_main_coroutine ||
-     n == m_opt.vcl_main ||
-     n == m_opt.vcl_terminate_code ||
-     n == m_opt.vcl_type_name ||
-     n == m_opt.vcl_add_function_name ||
-     n == m_opt.inline_module_name ||
-     n == m_opt.runtime_namespace)
-    goto fail;
-
-  for( size_t i = 0 ; i < boost::size(kLua51KeyWord) ; ++i ) {
-    if(n == kLua51KeyWord[i])
-      goto fail;
-  }
-
+  if(!CheckLuaKeyword(name)) goto fail;
   return true;
 
 fail:
@@ -421,22 +489,18 @@ void Transpiler::SetupHeader() {
   Comment comment(m_output,0);
   comment.Line("*********************************************************************************")
          .Line("************ This file is generated automatically, DO NOT MODIFY ****************")
-         .Line("************ Source : %s **************", m_filename.c_str())
-         .Line("************ Comment: %s **************", m_opt.comment.c_str())
-         .Line("************ Time: %s *****************", GetCurrentTime().c_str())
+         .Line("************ Source : %s", m_filename.c_str())
+         .Line("************ Comment: %s", m_opt.comment.c_str())
+         .Line("************ Time: %s", GetCurrentTime().c_str())
          .Line("*********************************************************************************");
 
   //  Setup the global variable for us to handle terminate return code
 
   comment.Line("builtin VCL variable for terminating return");
-  WriteLine(0,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.empty_code);
+  WriteLine(0,"%s = %d",kVCLTerminateCode,m_opt.empty_code);
 
   comment.Line("*************************** Builtin Functions Start *****************************");
-  if( m_opt.allow_builtin_add ) {
-    WriteLine(0,"function %s(a,b) \n%sreturn "
-                "((type(a) == \"string\" and type(b) ==\"string\") and (a..b) or (a+b))\nend",
-                m_opt.vcl_add_function_name.c_str(),kIndent);
-  }
+  m_output->append( kBuiltinFunctions );
   comment.Line("*************************** Builtin Functions End  ******************************");
 }
 
@@ -466,7 +530,7 @@ bool Transpiler::TranspileAnonymouosSub( const ast::Sub& node , int indent , std
     return false;
 
   // 3. end the function
-  output->append("end\n");
+  WriteLine(output,indent,"end");
   return true;
 }
 
@@ -501,7 +565,7 @@ bool Transpiler::Transpile( const ast::List& node , int indent , std::string* ou
   }
 
   // Add a tag into the table to show this is a list
-  wrapper.Add(m_opt.vcl_type_name,"\"list\"",false);
+  wrapper.Add(kVCLTypeName,"\"list\"",false);
   return true;
 }
 
@@ -613,16 +677,25 @@ bool Transpiler::Transpile( const ast::StringInterpolation& node, int indent , s
   // include using a string buffer like structure otherwise too many
   // temporary objects will be created which adds extra GC overheads in VM.
   //
-  // In Lua the simplest way is to use a table and then call table.concate
+  // In Lua the simplest way is to use a table and then call table.concat
 
-  output->append("table.concate({");
+  output->append("table.concat({");
 
   for( size_t i = 0 ; i < node.list.size() ; ++i ) {
-    output->append("tostring(");
-    arg_buffer.clear();
-    if(!TranspileExpression(*node.list.Index(i),indent,&arg_buffer)) return false;
-    output->append(arg_buffer);
-    output->push_back(')');
+    const ast::AST& comp = *node.list.Index(i);
+
+    if(comp.type != ast::AST_STRING) {
+      output->append("tostring(");
+      arg_buffer.clear();
+      if(!TranspileExpression(comp,indent,&arg_buffer)) return false;
+      output->append(arg_buffer);
+      output->push_back(')');
+    } else {
+      arg_buffer.clear();
+      if(!TranspileExpression(comp,indent,&arg_buffer)) return false;
+      output->append(arg_buffer);
+    }
+
     if(i < node.list.size()-1) output->append(",");
   }
 
@@ -666,7 +739,7 @@ bool Transpiler::Transpile( const ast::Unary& node , int indent , std::string* o
         break;
 
       case TK_NOT:
-        output->append("not");
+        output->append("not ");
         sub_count = 0;
         break;
       default:
@@ -704,7 +777,7 @@ bool Transpiler::Transpile( const ast::Binary& node , int indent , std::string* 
        !TranspileExpression(*node.rhs,indent,&rhs_buffer))
       return false;
 
-    FormatAppend(output,"%s(%s,%s)",m_opt.vcl_add_function_name.c_str(),
+    FormatAppend(output,"%s(%s,%s)",kVCLBuiltinAdd,
                                     lhs_buffer.c_str(),
                                     rhs_buffer.c_str());
   } else {
@@ -716,7 +789,7 @@ bool Transpiler::Transpile( const ast::Binary& node , int indent , std::string* 
       case TK_DIV: output->append(" / "); break;
       case TK_MOD: output->append(" % "); break;
       case TK_LT:  output->append(" < "); break;
-      case TK_LE:  output->append("<=") ; break;
+      case TK_LE:  output->append(" <= ") ; break;
       case TK_GT:  output->append(" > "); break;
       case TK_GE:  output->append(" >= ");break;
       case TK_EQ:  output->append(" == ");break;
@@ -769,9 +842,11 @@ bool Transpiler::Transpile( const ast::Prefix& node , size_t target , int indent
         break;
       case ast::Prefix::Component::DOT:
         if( i > 0 ) temp.push_back('.');
+        if(!CheckLuaKeyword(node.location,n.var)) return false;
         temp.append(n.var->data());
         break;
       case ast::Prefix::Component::ATTRIBUTE:
+        if(!CheckLuaKeyword(node.location,n.var)) return false;
         {
           std::string buffer;
           // Now we need to wrap the temporary buffer's stuff as a function call into a
@@ -878,9 +953,41 @@ bool Transpiler::Transpile( const ast::Set& node , int indent , std::string* out
 
   if( node.lhs.type == ast::LeftHandSide::VARIABLE ) {
     if(!CheckIdentifierName(node.location,node.lhs.variable)) return false;
-
-    WriteLine( output , indent , "%s = %s", node.lhs.variable->data(),
-                                   buffer.c_str());
+    switch(node.op) {
+      case TK_ASSIGN:
+        WriteLine( output , indent , "%s = %s", node.lhs.variable->data(),
+                                                buffer.c_str());
+        break;
+      case TK_SELF_ADD:
+        WriteLine( output , indent , "%s = %s(%s,%s)",node.lhs.variable->data(),
+                                                      kVCLBuiltinAdd,
+                                                      node.lhs.variable->data(),
+                                                      buffer.c_str());
+        break;
+      case TK_SELF_SUB:
+        WriteLine( output , indent , "%s = %s - %s", node.lhs.variable->data(),
+                                                     node.lhs.variable->data(),
+                                                     buffer.c_str());
+        break;
+      case TK_SELF_MUL:
+        WriteLine( output , indent , "%s = %s * %s", node.lhs.variable->data(),
+                                                     node.lhs.variable->data(),
+                                                     buffer.c_str());
+        break;
+      case TK_SELF_DIV:
+        WriteLine( output , indent , "%s = %s / %s", node.lhs.variable->data(),
+                                                     node.lhs.variable->data(),
+                                                     buffer.c_str());
+        break;
+      case TK_SELF_MOD:
+        WriteLine( output , indent , "%s = %s %% %s", node.lhs.variable->data(),
+                                                      node.lhs.variable->data(),
+                                                      buffer.c_str());
+        break;
+      default:
+        VCL_UNREACHABLE();
+        break;
+    }
   } else {
     std::string object;
 
@@ -893,16 +1000,99 @@ bool Transpiler::Transpile( const ast::Set& node , int indent , std::string* out
       if(!Transpile(*node.lhs.prefix,node.lhs.prefix->list.size()-1,indent,&object))
         return false;
 
-      // Handle the last component
-      WriteLine( output , indent , "%s.set_attr( %s , %s , %s )", m_opt.runtime_namespace.c_str(),
-                                                                  object.c_str(),
-                                                                  last_comp.var->data(),
-                                                                  buffer.c_str() );
+      switch(node.op) {
+        case TK_ASSIGN:
+          WriteLine( output , indent , "%s.attr.set( %s , %s , %s )", m_opt.runtime_namespace.c_str(),
+                                                                      object.c_str(),
+                                                                      last_comp.var->data(),
+                                                                      buffer.c_str() );
+          break;
+        case TK_SELF_ADD:
+          WriteLine( output , indent , "%s.attr.self_add( %s, %s, %s )", m_opt.runtime_namespace.c_str(),
+                                                                         object.c_str(),
+                                                                         last_comp.var->data(),
+                                                                         buffer.c_str());
+          break;
+        case TK_SELF_SUB:
+          WriteLine( output , indent , "%s.attr.self_sub( %s, %s, %s )", m_opt.runtime_namespace.c_str(),
+                                                                         object.c_str(),
+                                                                         last_comp.var->data(),
+                                                                         buffer.c_str());
+          break;
+        case TK_SELF_MUL:
+          WriteLine( output , indent , "%s.attr.self_mul( %s, %s, %s )", m_opt.runtime_namespace.c_str(),
+                                                                         object.c_str(),
+                                                                         last_comp.var->data(),
+                                                                         buffer.c_str());
+          break;
+        case TK_SELF_DIV:
+          WriteLine( output , indent , "%s.attr.self_div( %s, %s, %s )", m_opt.runtime_namespace.c_str(),
+                                                                         object.c_str(),
+                                                                         last_comp.var->data(),
+                                                                         buffer.c_str());
+          break;
+        case TK_SELF_MOD:
+          WriteLine( output , indent , "%s.attr.self_mod( %s, %s, %s )", m_opt.runtime_namespace.c_str(),
+                                                                         object.c_str(),
+                                                                         last_comp.var->data(),
+                                                                         buffer.c_str());
+          break;
+        default:
+          VCL_UNREACHABLE();
+          break;
+      }
     } else {
       if(!Transpile(*node.lhs.prefix,0,indent,&object))
         return false;
 
-      WriteLine( output , indent , "%s = %s", object.c_str() , buffer.c_str());
+      /* NOTES:
+       *
+       * The following transpilation code is not very efficient since the best way to
+       * work around it will be save the previous (n-1) prefix expression as local
+       * variable and assign to that local variable.
+       * Example:
+       *
+       * Our Code: set a.b.c.d.e += 10 ==> a.b.c.d.e = a.b.c.d.e + 10
+       *
+       * The above code is not optimal due to a.b.c.d.e's dictionary lookup perform twice,
+       *
+       * Better Code: set a.b.c.d.e += 10 ==> local __l = a.b.c.d; __l.e == __l.e + 10;
+       * Then we have less dicitonary lookup
+       */
+
+      switch( node.op ) {
+        case TK_ASSIGN:
+          WriteLine( output , indent , "%s = %s", object.c_str() , buffer.c_str());
+          break;
+        case TK_SELF_ADD:
+          WriteLine( output , indent , "%s = %s + %s", object.c_str(),
+                                                       object.c_str(),
+                                                       buffer.c_str());
+          break;
+        case TK_SELF_SUB:
+          WriteLine( output , indent , "%s = %s - %s", object.c_str(),
+                                                       object.c_str(),
+                                                       buffer.c_str());
+          break;
+        case TK_SELF_MUL:
+          WriteLine( output , indent , "%s = %s * %s", object.c_str(),
+                                                       object.c_str(),
+                                                       buffer.c_str());
+          break;
+        case TK_SELF_DIV:
+          WriteLine( output , indent , "%s = %s / %s", object.c_str(),
+                                                       object.c_str(),
+                                                       buffer.c_str());
+          break;
+        case TK_SELF_MOD:
+          WriteLine( output , indent , "%s = %s %% %s", object.c_str(),
+                                                        object.c_str(),
+                                                        buffer.c_str());
+          break;
+        default:
+          VCL_UNREACHABLE();
+          break;
+      }
     }
   }
   return true;
@@ -1001,40 +1191,40 @@ bool Transpiler::Transpile( const ast::Terminate& node, int indent , std::string
 
   switch(node.action) {
     case ACT_OK:
-      WriteLine(output, indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.ok_code);
+      WriteLine(output, indent,"%s = %d",kVCLTerminateCode,m_opt.ok_code);
       break;
     case ACT_FAIL:
-      WriteLine(output, indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.fail_code);
+      WriteLine(output, indent,"%s = %d",kVCLTerminateCode,m_opt.fail_code);
       break;
     case ACT_PIPE:
-      WriteLine(output, indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.pipe_code);
+      WriteLine(output, indent,"%s = %d",kVCLTerminateCode,m_opt.pipe_code);
       break;
     case ACT_HASH:
-      WriteLine(output, indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.hash_code);
+      WriteLine(output, indent,"%s = %d",kVCLTerminateCode,m_opt.hash_code);
       break;
     case ACT_PURGE:
-      WriteLine(output, indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.purge_code);
+      WriteLine(output, indent,"%s = %d",kVCLTerminateCode,m_opt.purge_code);
       break;
     case ACT_LOOKUP:
-      WriteLine(output, indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.lookup_code);
+      WriteLine(output, indent,"%s = %d",kVCLTerminateCode,m_opt.lookup_code);
       break;
     case ACT_RESTART:
-      WriteLine(output, indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.restart_code);
+      WriteLine(output, indent,"%s = %d",kVCLTerminateCode,m_opt.restart_code);
       break;
     case ACT_FETCH:
-      WriteLine(output, indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.fetch_code);
+      WriteLine(output, indent,"%s = %d",kVCLTerminateCode,m_opt.fetch_code);
       break;
     case ACT_MISS:
-      WriteLine(output, indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.miss_code);
+      WriteLine(output, indent,"%s = %d",kVCLTerminateCode,m_opt.miss_code);
       break;
     case ACT_DELIVER:
-      WriteLine(output, indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.deliver_code);
+      WriteLine(output, indent,"%s = %d",kVCLTerminateCode,m_opt.deliver_code);
       break;
     case ACT_RETRY:
-      WriteLine(output, indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.retry_code);
+      WriteLine(output, indent,"%s = %d",kVCLTerminateCode,m_opt.retry_code);
       break;
     case ACT_ABANDON:
-      WriteLine(output, indent,"%s = %d",m_opt.vcl_terminate_code.c_str(),m_opt.abandon_code);
+      WriteLine(output, indent,"%s = %d",kVCLTerminateCode,m_opt.abandon_code);
       break;
     default:
       ReportError(node.location,"Unsupport terminated return!");
@@ -1351,13 +1541,6 @@ bool Options::Create( const ::vcl::experiment::TranspilerOptionTable& tt ,
 #define DO(XX,YY) if(!MaybeSet(tt,XX,&(opt->YY),error)) return false
 
   DO("comment",comment);
-  DO("temporary_variable_prefix",temporary_variable_prefix);
-  DO("vcl_main",vcl_main);
-  DO("vcl_main_coroutine",vcl_main_coroutine);
-  DO("vcl_terminate_code",vcl_terminate_code);
-  DO("vcl_type_name",vcl_type_name);
-  DO("vcl_add_function_name",vcl_add_function_name);
-  DO("allow_builtin_add",allow_builtin_add);
   DO("allow_terminate_return",allow_terminate_return);
   DO("ok_code",ok_code);
   DO("fail_code",fail_code);

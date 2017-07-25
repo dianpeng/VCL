@@ -16,16 +16,6 @@ struct Options {
   // Script comment
   std::string comment;
 
-  // Temporary variable prefix
-  std::string temporary_variable_prefix;
-
-  std::string vcl_main;
-  std::string vcl_main_coroutine;
-  std::string vcl_terminate_code;
-  std::string vcl_type_name;
-  std::string vcl_add_function_name;
-  bool allow_builtin_add;
-
   // Support action return
   bool allow_terminate_return;
 
@@ -79,13 +69,6 @@ struct Options {
  public:
   Options():
     comment                  (),
-    temporary_variable_prefix("__VCL_temp__"),
-    vcl_main                 ("__VCL_main__"),
-    vcl_main_coroutine       ("__VCL_main_coroutine__"),
-    vcl_terminate_code       ("__VCL_terminate_code__"),
-    vcl_type_name            ("__VCL_type__"),
-    vcl_add_function_name    ("__VCL_builtin_add__"),
-    allow_builtin_add        (true),
     allow_terminate_return   (true),
     ok_code                  (0),
     fail_code                (1),

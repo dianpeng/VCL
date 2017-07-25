@@ -473,7 +473,7 @@ bool Compiler::Compile(const ast::StringInterpolation& node) {
     const ast::AST* e = node.list.Index(i);
     if (e->type == ast::AST_STRING) {
       int index =
-          CompileString(e->location, static_cast<const ast::String*>(e)->value);
+        CompileString(e->location, static_cast<const ast::String*>(e)->value);
       if (index < 0) return false;
       __ lstr(e->location, index);
     } else {

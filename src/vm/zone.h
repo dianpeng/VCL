@@ -1,6 +1,7 @@
 #ifndef ZONE_H_
 #define ZONE_H_
 #include <vcl/util.h>
+#include <algorithm>
 
 #include <boost/static_assert.hpp>
 #include <boost/type_traits.hpp>
@@ -351,6 +352,12 @@ class ZoneVector : public ZoneObject {
   T& First() {
     CHECK(!empty());
     return Index(0);
+  }
+
+  void Swap( ZoneVector* another ) {
+    std::swap(m_data,another->m_data);
+    std::swap(m_size,another->m_size);
+    std::swap(m_capacity,another->m_capacity);
   }
 
   void Clear() {

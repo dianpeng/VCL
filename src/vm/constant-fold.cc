@@ -50,6 +50,7 @@ class ConstantFolder {
   ast::AST* Fold(ast::Ternary*, FoldResult*);
   ast::AST* Fold(ast::Unary*, FoldResult*);
   ast::AST* Fold(ast::StringConcat*, FoldResult*);
+  ast::AST* Fold(ast::StringInterpolation*, FoldResult*);
   ast::AST* Fold(ast::AST*, FoldResult*);
   ast::AST* GenNode(const FoldResult&);
   ExpressionKind ArithPromotion(ExpressionKind, ExpressionKind);
@@ -169,6 +170,8 @@ ast::AST* ConstantFolder::Fold(ast::AST* node, FoldResult* result) {
       return Fold(static_cast<ast::Ternary*>(node), result);
     case ast::AST_STRING_CONCAT:
       return Fold(static_cast<ast::StringConcat*>(node), result);
+    case ast::AST_STRING_INTERPOLATION:
+      return Fold(static_cast<ast::StringInterpolation*>(node), result);
     case ast::AST_INTEGER:
       result->kind = EKIND_INTEGER;
       result->value = static_cast<ast::Integer*>(node)->value;
@@ -607,6 +610,46 @@ ast::AST* ConstantFolder::Fold(ast::StringConcat* node, FoldResult* result) {
   result->kind = EKIND_STRING;
   result->value = zone::ZoneString::New(m_zone, buffer);
   return NULL;
+}
+
+ast::AST* ConstantFolder::Fold(ast::StringInterpolation* node, FoldResult* result) {
+  std::string buffer;
+  buffer.reserve( 1024 );
+  vcl::util::CodeLocation last_loc = node->location;
+  zone::ZoneVector<ast::AST*> rset;
+
+  for( size_t i = 0 ; i < node->list.size() ; ++i ) {
+    ast::AST& n = *node->list.Index(i);
+    if(n.type == ast::AST_STRING) {
+      // Now we append the string literal into our buffer
+      buffer.append( static_cast<const ast::String&>(n).value->data() );
+      last_loc = n.location;
+    } else {
+      if(!buffer.empty()) {
+        rset.Add(m_zone,
+                 new (m_zone) ast::String(last_loc,zone::ZoneString::New(m_zone,buffer)));
+        buffer.clear();
+      }
+      rset.Add(m_zone,&n);
+    }
+  }
+
+  if(!rset.empty()) {
+    if(!buffer.empty()) {
+      rset.Add(m_zone,
+               new (m_zone) ast::String(last_loc,zone::ZoneString::New(m_zone,buffer)));
+    }
+    result->location = node->location;
+    result->kind = EKIND_COMPLEX;
+    node->list.Swap( &rset );
+    return node; // Complex result , cannot be folded anymore
+  } else {
+    DCHECK( !buffer.empty() );
+    result->kind = EKIND_STRING;
+    result->location = node->location;
+    result->value = zone::ZoneString::New(m_zone,buffer);
+    return NULL; // Folded result
+  }
 }
 
 ast::AST* ConstantFolder::Fold(ast::Ternary* node, FoldResult* result) {

@@ -1367,8 +1367,14 @@ ast::AST* Parser::ParseStringInterpolation() {
   do {
     switch (m_lexer.lexeme().token) {
       case TK_INTERP_END:
-        m_lexer.Next();
-        goto done;
+        if(m_lexer.Next().token == TK_INTERP_START) {
+          m_lexer.Next(); // Yet another string interpolation section starts
+          interp->list.Add(m_zone,
+              new (m_zone) ast::String(m_lexer.location(),zone::ZoneString::New(m_zone,"\n")));
+        } else {
+          goto done;
+        }
+        break;
       case TK_CODE_START: {
         m_lexer.Next();  // Skip the ${
 

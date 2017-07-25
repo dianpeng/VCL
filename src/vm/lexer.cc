@@ -119,19 +119,34 @@ const Lexeme& Lexer::LexStringInterpolation() {
   for (; (c = src[start]); ++start) {
     if (c == '\\') {
       int nc = src[start + 1];
-      if (nc == '\\' || nc == '\'' || nc == '{') {
-        buf.push_back(nc);
-        ++start;
-        continue;
+      switch(nc) {
+        case 'n': buf.push_back('\n'); ++start; continue;
+        case 'a': buf.push_back('\a'); ++start; continue;
+        case 'b': buf.push_back('\b'); ++start; continue;
+        case 'f': buf.push_back('\f'); ++start; continue;
+        case 'r': buf.push_back('\r'); ++start; continue;
+        case 't': buf.push_back('\t'); ++start; continue;
+        case 'v': buf.push_back('\v'); ++start; continue;
+        case '\\':buf.push_back('\\'); ++start; continue;
+        case '\'':buf.push_back('\''); ++start; continue;
+        case '{' :buf.push_back('{') ; ++start; continue;
+        default: break;
       }
     } else if (c == '$') {
       int nc = src[start + 1];
       if (nc == '{') break;
     } else if (c == '\'') {
       break;
-    } else {
-      buf.push_back(c);
     }
+
+    if(c == '\n' || c == '\a' || c == '\b' ||
+       c == '\f' || c == '\r' || c == '\t' ||
+       c == '\v') {
+      LexerError("Character(ASIC code) %d needs to be *escaped* instead of putting the literal here!"
+                 "Does this source code not written in valid character set or generated?",c);
+      return m_lexeme;
+    }
+    buf.push_back(c);
   }
 
   m_lexeme.value = buf;
@@ -234,6 +249,20 @@ const Lexeme& Lexer::LexCode() {
         return LexNumPrefix();
       case '"':
         return LexLineStr<'"'>();
+      case '\\':
+        {
+          // Handle line concatenation
+          int nc = src[m_pos+1];
+          if(nc == '\n') {
+            nc += 2;
+            ++m_line;
+            m_pos = 1;
+          } else {
+            LexerError();
+            return m_lexeme;
+          }
+          break;
+        }
       case ' ':
       case '\t':
       case '\r':
@@ -261,7 +290,7 @@ const Lexeme& Lexer::LexCode() {
   } while (true);
 }
 
-#undef YIELD
+#undef YIELD // YIELD
 
 bool Lexer::TryTokenAsExtendedVar() {
   const char* src = m_source.c_str();

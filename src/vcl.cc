@@ -1932,7 +1932,7 @@ bool TranspileString( const std::string& filename ,
 
         Engine engine;
         boost::shared_ptr<CompiledCode> cc(new CompiledCode(&engine));
-        SourceRepo source_repo(NULL, vcl_options.allow_loop,false);
+        SourceRepo source_repo(NULL, false,false);
         vm::CompilationUnit cu;
 
         // 1. Initialize source repo and load/parse the entry file

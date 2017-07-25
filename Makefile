@@ -6,7 +6,7 @@
 TESTFLAG=-Isrc/ -g3 -Iinclude/ -Wall -fsanitize=address -DVCL_MINIMUM_GC_GAP=0
 
 # Testing libs
-TESTLIB=-lglog -lpcre -lgtest -lpthread -lboost_system -lboost_filesystem -lboost_date_time
+TESTLIB=-lglog -lpcre -lgtest -lpthread -lboost_system -lboost_filesystem -lboost_date_time -lboost_program_options
 
 # Libarary libs
 LIBRARYLIB=-lglog -lpcre -lpthread -lboost_system -lboost_date_time
@@ -88,6 +88,9 @@ lua51-unit-test: $(SOURCE) $(INCLUDE) test/vm/transpiler/target-lua51-test.cc
 
 lua51-driver: $(SOURCE) $(INCLUDE) test/vm/transpiler/target-lua51-driver.cc
 	$(CXX) $(TESTFLAG) $(SOURCE) test/vm/transpiler/target-lua51-driver.cc $(TESTLIB) -o lua51-driver
+
+lua51-transpiler: $(SOURCE) $(INCLUDE) bin/transpiler/transpiler-lua51.cc
+	$(CXX) $(TESTFLAG) $(SOURCE) bin/transpiler/transpiler-lua51.cc $(TESTLIB) -o vcl2lua51
 
 test/%.t : test/%.cc
 	$(CXX) $(SOURCE) $(TESTFLAG) -o $@ $< $(TESTLIB)
