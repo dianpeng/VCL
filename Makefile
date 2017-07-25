@@ -15,7 +15,7 @@ LIBRARYLIB=-lglog -lpcre -lpthread -lboost_system -lboost_date_time
 LIBRARYFLAG=-Isrc/ -g3 -O3 -Iinclude/ -Wall -fsanitize=address
 
 # Production flags
-PRODUCTIONFLAG=-Isrc -g3 -Iinclude/ -Wall -DNDEBUG
+PRODUCTIONFLAG=-Isrc -O3 -g3 -Iinclude/ -Wall -DNDEBUG
 
 # Files
 SOURCE:=$(shell find src/ -type f -name "*.cc")

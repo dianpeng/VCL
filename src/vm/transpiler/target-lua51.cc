@@ -55,15 +55,15 @@ static const char* kBuiltinFunctions =
   "function __vcl_builtin_FunctionType(a)\n"
   "  local t = __vcl_builtin_FunctionLuaType(a)\n"
   "  if (t == \"table\") then\n"
-  "    if (__vcl_builtin_FunctionKeyExist(a,\"__vcl_builtin_Type\")) and a.__vcl_builtin_Type == \"list\" then\n"
-  "      return \"list\"\n"
+  "    if (__vcl_builtin_FunctionKeyExist(a,\"__vcl_builtin_Type\")) then\n"
+  "      return a.__vcl_builtin_Type\n"
   "    else\n"
   "      return \"dict\"\n"
   "    end\n"
   "  end\n"
   "  return t\n"
   "end\n"
-  "local type = __vcl_builtin_FunctionType\n"
+  "type = __vcl_builtin_FunctionType\n"
   /* __vcl__builtin_FunctionAdd */
   "function __vcl_builtin_FunctionAdd(a,b)\n"
   "  return ((type(a) == \"string\" and type(b) == \"string\") and (a..b) or (a+b))\n"
@@ -81,7 +81,11 @@ static const char* kBuiltinFunctions =
   "function __vcl_builtin_FunctionPrintln(...)\n"
   "  print(unpack(arg))\n"
   "end\n"
-  "local println = __vcl_builtin_FunctionPrintln\n";
+  "println = __vcl_builtin_FunctionPrintln\n"
+  "local __vcl_builtin_TableConcat = table.concat\n"
+  "function __vcl_builtin_FunctionJoin(...)\n"
+  "  return __vcl_builtin_TableConcat(arg,\"\")\n"
+  "end\n";
 
 // The commented out keyword are keywords that are shared between Lua5.1 and VCL
 static const char* kLua51KeyWord[] = {
@@ -502,6 +506,12 @@ void Transpiler::SetupHeader() {
   comment.Line("*************************** Builtin Functions Start *****************************");
   m_output->append( kBuiltinFunctions );
   comment.Line("*************************** Builtin Functions End  ******************************");
+
+  if( !m_opt.runtime_path.empty() ) {
+    WriteLine(0,"local %s = require(\"%s\")",m_opt.runtime_namespace.c_str(),
+                                             EscapeLuaString(m_opt.runtime_path.c_str()).c_str());
+  }
+
 }
 
 void Transpiler::SetupFooter() {
@@ -620,10 +630,10 @@ bool Transpiler::Transpile( const ast::Duration& node , int indent , std::string
   arg["millisecond"] = Template::Str( ::vcl::util::Format("%d",node.value.millisecond) );
 
   CHECK( m_te.Render("%{ns}.new_duration({"
-                       "hour=${hour},"
+                       "millisecond=${millisecond}})"
                        "minute=${minute},"
                        "second=${second},"
-                       "millisecond=${millisecond}})",arg,output));
+                       "hour=${hour},",arg,output));
   return true;
 }
 
@@ -679,7 +689,7 @@ bool Transpiler::Transpile( const ast::StringInterpolation& node, int indent , s
   //
   // In Lua the simplest way is to use a table and then call table.concat
 
-  output->append("table.concat({");
+  output->append("__vcl_builtin_FunctionJoin(");
 
   for( size_t i = 0 ; i < node.list.size() ; ++i ) {
     const ast::AST& comp = *node.list.Index(i);
@@ -699,7 +709,7 @@ bool Transpiler::Transpile( const ast::StringInterpolation& node, int indent , s
     if(i < node.list.size()-1) output->append(",");
   }
 
-  output->append("},\"\")");
+  output->push_back(')');
 
   return true;
 }
@@ -841,9 +851,14 @@ bool Transpiler::Transpile( const ast::Prefix& node , size_t target , int indent
         temp.push_back(']');
         break;
       case ast::Prefix::Component::DOT:
-        if( i > 0 ) temp.push_back('.');
         if(!CheckLuaKeyword(node.location,n.var)) return false;
-        temp.append(n.var->data());
+        if( i > 0 ) {
+          temp.append("[\"");
+          temp.append(n.var->data());
+          temp.append("\"]");
+        } else {
+          temp.append(n.var->data());
+        }
         break;
       case ast::Prefix::Component::ATTRIBUTE:
         if(!CheckLuaKeyword(node.location,n.var)) return false;
@@ -851,7 +866,7 @@ bool Transpiler::Transpile( const ast::Prefix& node , size_t target , int indent
           std::string buffer;
           // Now we need to wrap the temporary buffer's stuff as a function call into a
           // {runtime}.get_attr(object,key) call since Lua doesn't support attribute syntax.
-          FormatAppend(&buffer,"%s.get_attr(%s,%s)",m_opt.runtime_namespace.c_str(),
+          FormatAppend(&buffer,"%s.attr.get(%s,\"%s\")",m_opt.runtime_namespace.c_str(),
                                                     temp.c_str(),
                                                     n.var->data());
           temp.swap(buffer);
@@ -1002,40 +1017,40 @@ bool Transpiler::Transpile( const ast::Set& node , int indent , std::string* out
 
       switch(node.op) {
         case TK_ASSIGN:
-          WriteLine( output , indent , "%s.attr.set( %s , %s , %s )", m_opt.runtime_namespace.c_str(),
-                                                                      object.c_str(),
-                                                                      last_comp.var->data(),
-                                                                      buffer.c_str() );
+          WriteLine( output , indent , "%s.attr.set( %s , \"%s\" , %s )", m_opt.runtime_namespace.c_str(),
+                                                                          object.c_str(),
+                                                                          last_comp.var->data(),
+                                                                          buffer.c_str() );
           break;
         case TK_SELF_ADD:
-          WriteLine( output , indent , "%s.attr.self_add( %s, %s, %s )", m_opt.runtime_namespace.c_str(),
-                                                                         object.c_str(),
-                                                                         last_comp.var->data(),
-                                                                         buffer.c_str());
+          WriteLine( output , indent , "%s.attr.self_add( %s, \"%s\" , %s )", m_opt.runtime_namespace.c_str(),
+                                                                              object.c_str(),
+                                                                              last_comp.var->data(),
+                                                                              buffer.c_str());
           break;
         case TK_SELF_SUB:
-          WriteLine( output , indent , "%s.attr.self_sub( %s, %s, %s )", m_opt.runtime_namespace.c_str(),
-                                                                         object.c_str(),
-                                                                         last_comp.var->data(),
-                                                                         buffer.c_str());
+          WriteLine( output , indent , "%s.attr.self_sub( %s, \"%s\", %s )", m_opt.runtime_namespace.c_str(),
+                                                                             object.c_str(),
+                                                                             last_comp.var->data(),
+                                                                             buffer.c_str());
           break;
         case TK_SELF_MUL:
-          WriteLine( output , indent , "%s.attr.self_mul( %s, %s, %s )", m_opt.runtime_namespace.c_str(),
-                                                                         object.c_str(),
-                                                                         last_comp.var->data(),
-                                                                         buffer.c_str());
+          WriteLine( output , indent , "%s.attr.self_mul( %s, \"%s\", %s )", m_opt.runtime_namespace.c_str(),
+                                                                             object.c_str(),
+                                                                             last_comp.var->data(),
+                                                                             buffer.c_str());
           break;
         case TK_SELF_DIV:
-          WriteLine( output , indent , "%s.attr.self_div( %s, %s, %s )", m_opt.runtime_namespace.c_str(),
-                                                                         object.c_str(),
-                                                                         last_comp.var->data(),
-                                                                         buffer.c_str());
+          WriteLine( output , indent , "%s.attr.self_div( %s, \"%s\", %s )", m_opt.runtime_namespace.c_str(),
+                                                                             object.c_str(),
+                                                                             last_comp.var->data(),
+                                                                             buffer.c_str());
           break;
         case TK_SELF_MOD:
-          WriteLine( output , indent , "%s.attr.self_mod( %s, %s, %s )", m_opt.runtime_namespace.c_str(),
-                                                                         object.c_str(),
-                                                                         last_comp.var->data(),
-                                                                         buffer.c_str());
+          WriteLine( output , indent , "%s.attr.self_mod( %s, \"%s\", %s )", m_opt.runtime_namespace.c_str(),
+                                                                             object.c_str(),
+                                                                             last_comp.var->data(),
+                                                                             buffer.c_str());
           break;
         default:
           VCL_UNREACHABLE();
@@ -1137,7 +1152,7 @@ bool Transpiler::Transpile( const ast::Unset& node , int indent , std::string* o
 
     switch(last_comp.tag) {
       case ast::Prefix::Component::ATTRIBUTE:
-        WriteLine(output,indent,"%s.unset_attr(%s,%s)",m_opt.runtime_namespace.c_str(),
+        WriteLine(output,indent,"%s.attr.unset(%s,%s)",m_opt.runtime_namespace.c_str(),
                                                        buffer.c_str(),
                                                        last_comp.var->data());
         break;
@@ -1558,6 +1573,7 @@ bool Options::Create( const ::vcl::experiment::TranspilerOptionTable& tt ,
   DO("allow_module_inline",allow_module_inline);
   if(opt->allow_module_inline) DO("inline_module_name",inline_module_name);
   DO("runtime_namespace",runtime_namespace);
+  DO("runtime_path",runtime_path);
 
 #undef DO // DO
 

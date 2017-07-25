@@ -11,4 +11,4 @@ if [ "$#" -ne 1 ]; then
   exit -1
 fi
 
-cat $1 | $bin_path | awk '{ print $0 } END { print "test() print(\"DONE\")" }' | tee $.generated.lua | lua -
+cat $1 | $bin_path --runtime-path="lua/runtime" | awk '{ print $0 } END { print "test() print(\"DONE\")" }' | tee $1.generated.lua | lua -

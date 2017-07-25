@@ -61,6 +61,11 @@ struct Options {
   // Runtime support -------------------------------------------------
   std::string runtime_namespace;
 
+  // If we need to inline runtime based on the runtime path
+  // this means we will generate a line of code like this
+  //
+  // local ${runtime_namespace} = require(${runtime_path})
+  std::string runtime_path;
 
   // Creation function for creating a Options object from the TranspilerOptionTable
   static bool Create( const ::vcl::experiment::TranspilerOptionTable& , Options* ,
@@ -85,7 +90,8 @@ struct Options {
     empty_code               (-1),
     allow_module_inline      (false),
     inline_module_name       (),
-    runtime_namespace        ("vcl.runtime")
+    runtime_namespace        ("vcl"),
+    runtime_path             ("")
   {}
 };
 
