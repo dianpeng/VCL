@@ -13,6 +13,12 @@ local _join = function(...)
   return table.concat(arg,"")
 end
 
+-- Save the hooked upvalue function since after the runtime.lua gets loaded then
+-- all the lua's original function will be redirected or not useable
+local _type = type
+local _rawset = rawset
+local _tostring = tostring
+
 return {
   attr = {
     -- Get attribute named of "b" from object "a"
@@ -92,25 +98,36 @@ return {
 
   -- Size object
   new_size = function(b,kb,mb,gb)
-    return {
+    local obj = {
       bytes = b,
       kilobytes = kb,
       megabytes = mb,
       gigabytes = gb,
-
       __vcl_builtin_Type = "size"
     }
+    setmetatable(obj,{
+      __newindex = function(_,a,b)
+        error("Cannot mutate size object, it is readonly")
+      end
+    })
+    return obj
   end,
 
   -- Duration object
   new_duration= function(ms,s,min,hour)
-    return {
+    local obj = {
       hour = hour,
       minute = min,
       second = s,
       millisecond = ms,
       __vcl_builtin_Type = "duration"
     }
+    setmetatable(obj,{
+      __newindex = function(_,a,b)
+        error("Cannot mutate duration object, it is readonly")
+      end
+    })
+    return obj
   end,
 
   -- We need to support PCRE or just default to use native Lua's pattern
@@ -131,6 +148,60 @@ return {
     assert(tb == "string","pattern in !~ expression must be string type but got type "..tb)
     return string.match(a,b) == nil
   end,
+
+  -- new_list/new_dict functions, these 2 functions wraps the way to create a list and dict
+  -- in Lua environment , the key here is that we hook the metatable to do the job which enforce
+  -- user to *not* use __vcl_builtin_Type as a valid key . This key is used internally to track
+  -- the type of the object
+  new_list = function(init)
+    init.__vcl_builtin_Type = "list"
+    setmetatable(init,{
+      __newindex = function(_,a,b)
+        assert(a ~= "__vcl_builtin_Type","Cannot mutate key __vcl_builtin_Type which is used internally")
+        _rawset(init,a,b)
+      end
+    })
+    return init
+  end,
+
+  new_dict = function(init)
+    init.__vcl_builtin_Type = "dict"
+    setmetatable(init,{
+      __newindex = function(_,a,b)
+        assert(a ~= "__vcl_builtin_Type","Cannot mutate key __vcl_builtin_Type which is used internally")
+        _rawset(init,a,b)
+      end
+    })
+    return init
+  end,
+
+  -- Type global functions
+  type = function(a)
+    local t = _type(a)
+    if (t == "table") then
+      if a.__vcl_builtin_Type ~= nil then
+        return a.__vcl_builtin_Type
+      else
+        return "dict"
+      end
+    end
+    return t
+  end,
+
+  -- Add operator , all add operation will be redirected to this function
+  op_add = function(a,b)
+    local ta = _type(a)
+    local tb = _type(b)
+    return (( ta == "string" and tb == "string" ) and (a..b) or (a+b))
+  end,
+
+  -- Misc runtime functions
+
+  to_string = function(a)
+    return _tostring(a)
+  end,
+
+  join = _join,
 
   -- Extension exposed. If we allow any extension, then we need to wrap it in the following
   -- table/namespace. Read the section of extension for more information

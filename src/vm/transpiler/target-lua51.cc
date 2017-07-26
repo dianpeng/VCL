@@ -33,59 +33,10 @@ static const size_t kIndentSize = 2;
 // Builtin variables or other stuff name
 static const char* kVCLVariablePrefix = "__vcl";
 
-static const char* kVCLTypeName = "__vcl_builtin_Type";
+// static const char* kVCLTypeName = "__vcl_builtin_Type";
 // static const char* kVCLMain = "__vcl_builtin_Main";
 // static const char* kVCLMainCoroutine = "__vcl_builtin_MainCoroutine";
 static const char* kVCLTerminateCode = "__vcl_builtion_TerminateCode";
-
-// Builtin functions
-static const char* kVCLBuiltinAdd = "__vcl_builtin_FunctionAdd";
-// static const char* kVCLBuiltinType= "__vcl_builtin_FunctionType";
-// static const char* kVCLBuiltinKeyExist= "__vcl_builtinFunctionKeyExist";
-
-// Lua builtin codes to make the code functioning
-//
-// We cannot use typical stringify macro trick in this case since pp doesn't
-// preserve newline so the code generated will be super mass to debug and
-// read with. We have to code it in string literal which is kind of sucky since
-// C++ , util 03 , doesn't have multiple line string literals.
-static const char* kBuiltinFunctions =
-  /* __vcl_builtin_FunctionType */
-  "local __vcl_builtin_FunctionLuaType = type\n" \
-  "function __vcl_builtin_FunctionType(a)\n"
-  "  local t = __vcl_builtin_FunctionLuaType(a)\n"
-  "  if (t == \"table\") then\n"
-  "    if (__vcl_builtin_FunctionKeyExist(a,\"__vcl_builtin_Type\")) then\n"
-  "      return a.__vcl_builtin_Type\n"
-  "    else\n"
-  "      return \"dict\"\n"
-  "    end\n"
-  "  end\n"
-  "  return t\n"
-  "end\n"
-  "type = __vcl_builtin_FunctionType\n"
-  /* __vcl__builtin_FunctionAdd */
-  "function __vcl_builtin_FunctionAdd(a,b)\n"
-  "  return ((type(a) == \"string\" and type(b) == \"string\") and (a..b) or (a+b))\n"
-  "end\n"
-  /* __vcl_builtin_FunctionKeyExist */
-  "function __vcl_builtin_FunctionKeyExist(a,key)\n"
-  "  for k, _ in __vcl_builtin_FunctionLuapairs(a) do\n"
-  "     if (k == key) then\n"
-  "       return true\n"
-  "     end\n"
-  "  end\n"
-  "  return false\n"
-  "end\n"
-  /* __vcl_builtin_FunctionPrintln */
-  "function __vcl_builtin_FunctionPrintln(...)\n"
-  "  print(__vcl_builtin_FunctionLuaunpack(arg))\n"
-  "end\n"
-  "println = __vcl_builtin_FunctionPrintln\n"
-  "local __vcl_builtin_TableConcat = table.concat\n"
-  "function __vcl_builtin_FunctionJoin(...)\n"
-  "  return __vcl_builtin_TableConcat(arg,\"\")\n"
-  "end\n";
 
 // The commented out keyword are keywords that are shared between Lua5.1 and VCL
 static const char* kLua51KeyWord[] = {
@@ -112,6 +63,13 @@ static const char* kLua51KeyWord[] = {
   "while"
 };
 
+// A list of specific Lua variables name that has special meaning to Lua but not
+// serve as Keyword. Using them is unsafe since they allow the code to be escaped
+// from sandboxed VCL environment
+static const char* kLua51Reserved[] = {
+  "_G",
+  "_ENV"
+};
 
 inline std::string GetIndent( int indent ) {
   std::string buffer;
@@ -288,9 +246,6 @@ class Transpiler {
     return true;
   }
 
-  // Dislabe certain lua function while running the scripts
-  void DisableLuaFunction( const char* );
-
  private:
   // Initialization
   void SetupHeader();
@@ -403,24 +358,26 @@ bool Transpiler::CheckLuaKeyword( zone::ZoneString* name ) {
 
 bool Transpiler::CheckIdentifierName( const vcl::util::CodeLocation& loc , zone::ZoneString* name ) {
   std::string n(name->ToStdString());
+
+  // Check whether it is a vcl builtin variable name
   if(n.find(kVCLVariablePrefix) == 0)
     goto fail;
 
+  // Check whether it uses a lua reserved word or not
+  for( size_t i = 0 ; i < boost::size( kLua51Reserved ); ++i ) {
+    if(n == kLua51Reserved[i])
+      goto fail;
+  }
+
+  // Check lua keyword is in used or not
   if(!CheckLuaKeyword(name)) goto fail;
   return true;
 
 fail:
   ReportError(loc,"Cannot use identifier name %s which collide with builtin variable "
-                  "name or Lua5.1 keyword. Please change your variable name !",
+                  "name or Lua5.1 keyword. Please change your variable name!",
                   name->data());
   return false;
-}
-
-void Transpiler::DisableLuaFunction( const char* function_name ) {
-  Comment comment(m_output,0);
-  comment.Line("Disable Lua's builtin function or global function %s",function_name);
-  WriteLine(0,"local __vcl_builtin_FunctionLua%s = %s",function_name,function_name);
-  WriteLine(0,"%s = nil",function_name);
 }
 
 bool Transpiler::GenerateFunctionPrototype( const std::string& key ,
@@ -503,9 +460,9 @@ void Transpiler::SetupHeader() {
   Comment comment(m_output,0);
   comment.Line("*********************************************************************************")
          .Line("************ This file is generated automatically, DO NOT MODIFY ****************")
-         .Line("************ Source : %s", m_filename.c_str())
-         .Line("************ Comment: %s", m_opt.comment.c_str())
-         .Line("************ Time: %s", GetCurrentTime().c_str())
+         .Line("************ Source:%s", m_filename.c_str())
+         .Line("************ Comment:%s", m_opt.comment.c_str())
+         .Line("************ Time:%s", GetCurrentTime().c_str())
          .Line("*********************************************************************************");
 
   //  Setup the global variable for us to handle terminate return code
@@ -513,47 +470,65 @@ void Transpiler::SetupHeader() {
   comment.Line("builtin VCL variable for terminating return");
   WriteLine(0,"%s = %d",kVCLTerminateCode,m_opt.empty_code);
 
-#define DO(NAME) if(m_opt.disable_##NAME) DisableLuaFunction( #NAME )
-
-  DO(collectgarbage);
-  DO(dofile);
-  DO(getfenv);
-  DO(getmetatable);
-  DO(ipairs);
-  DO(load);
-  DO(loadfile);
-  DO(loadstring);
-  DO(module);
-  DO(next);
-  DO(pairs);
-  DO(pcall);
-  DO(rawequal);
-  DO(rawget);
-  DO(require);
-  DO(select);
-  DO(setfenv);
-  DO(setmetatable);
-  DO(unpack);
-  DO(xpcall);
-
-#undef DO // DO
-
-  comment.Line("*************************** Builtin Functions Start *****************************");
-  m_output->append( kBuiltinFunctions );
-  comment.Line("*************************** Builtin Functions End  ******************************");
-
-  if( !m_opt.runtime_path.empty() ) {
-    WriteLine(0,"local %s = __vcl_builtin_FunctionLuarequire(\"%s\")",m_opt.runtime_namespace.c_str(),
-                                                                      EscapeLuaString(m_opt.runtime_path.c_str()).c_str());
+  // Change the Lua's builtin _VERSION string into VCL's version
+  {
+    comment.Line("Change version string to VCL version");
+    WriteLine(0,"local __vcl_builtin_LuaVersion = _VERSION");
+    WriteLine(0,"_VERSION = \"vcl 4.0\"");
   }
 
+  if( !m_opt.runtime_path.empty() ) {
+    WriteLine(0,"local %s = require(\"%s\")",m_opt.runtime_namespace.c_str(),
+                                             EscapeLuaString(m_opt.runtime_path.c_str()).c_str());
+  }
 
+  comment.Line("*************************** Runtime Function Alias ******************************");
+  // For performance purpose we alias most of our runtime function into local __vcl start variable
+  // to avoid dictionary lookup
+  WriteLine(0,"local __vcl_builtin_Type = type");
+  WriteLine(0,"local __vcl_builtin_Unpack= unpack");
+  WriteLine(0,"local __vcl_builtin_TableConcat= table.concat");
+  WriteLine(0,"local __vcl_builtin_CoroutineYield = coroutine.yield");
+  WriteLine(0,"local __vcl_builtin_Rawset = rawset");
+  WriteLine(0,"local __vcl_builtin_Require= require");
+  WriteLine(0,"local type = %s.type",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local println = print");
+  WriteLine(0,"local size = %s.size",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_Join = %s.join",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_Add = %s.op_add",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_Match = %s.match",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_NotMatch = %s.not_match",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_NewList = %s.new_list",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_NewDict = %s.new_dict",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_NewSize = %s.new_size",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_NewDuration = %s.new_duration",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_Extension = %s.extension",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_AttrGet = %s.attr.get",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_AttrSet = %s.attr.set",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_AttrUnset=%s.attr.unset",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_AttrSelfAdd = %s.attr.self_add",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_AttrSelfSub = %s.attr.self_sub",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_AttrSelfMul = %s.attr.self_mul",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_AttrSelfDiv = %s.attr.self_div",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_AttrSelfMod = %s.attr.self_mod",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_UnsetProp = %s.unset_prop",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_ToString = %s.to_string",m_opt.runtime_namespace.c_str());
+  comment.Line("*********************** Runtime Function Alias End ******************************");
+
+  comment.Line("********************* Mask Lua's Global Function ********************************");
+  WriteLine(0,"rawset = nil");
+  WriteLine(0,"require= nil");
+  comment.Line("********************* Mask Lua's Global Function End ****************************");
+
+  comment.Line("*********************************************************************************");
+  comment.Line("*************************** Generated Code Start ********************************");
+  comment.Line("*********************************************************************************");
 }
 
 void Transpiler::SetupFooter() {
   Comment comment(m_output,0);
   comment.Line("*********************************************************************************")
-         .Line("******************** Generated by VCL transpiler ********************************")
+         .Line("*************************** Generated Code End **********************************")
          .Line("*********************************************************************************");
 }
 
@@ -582,62 +557,66 @@ bool Transpiler::TranspileAnonymouosSub( const ast::Sub& node , int indent , std
 
 bool Transpiler::Transpile( const ast::ExtensionLiteral& node , int indent , std::string* output ) {
   Template::Argument arg;
-  arg["ns"] = Template::Str(m_opt.runtime_namespace);
   arg["name"] = Template::Str(node.type_name->data());
   arg["arg"] = Template::Value(NewExtensionInitializerGenerator(*node.initializer,indent));
 
-  CHECK( m_te.Render("${ns}.extension.${name}( ${arg} )",arg,output) );
+  CHECK( m_te.Render("__vcl_builtin_Extension.${name}( ${arg} )",arg,output) );
   return true;
 }
 
 bool Transpiler::Transpile( const ast::List& node , int indent , std::string* output ) {
-  Collection wrapper(output,"{","}");
-  std::string arg_buffer;
-  for( size_t i = 0 ; i < node.list.size() ; ++i ) {
-    arg_buffer.clear();
-    if(!TranspileExpression(*node.list.Index(i),indent,&arg_buffer)) return false;
+  FormatAppend(output,"__vcl_builtin_NewList(",m_opt.runtime_namespace.c_str());
+  {
+    Collection wrapper(output,"{","}");
+    std::string arg_buffer;
+    for( size_t i = 0 ; i < node.list.size() ; ++i ) {
+      arg_buffer.clear();
+      if(!TranspileExpression(*node.list.Index(i),indent,&arg_buffer)) return false;
 
-    // We cannot use Lua's builtin array , but have to generate key value pair for Lua
-    // to force it use 0 start index otherwise all the semantic gonna break. This is
-    // OK unless we don't use too much loop code here. If we will need to generate code
-    // for looping, the best bet we can have is using something like this:
-    //
-    //   for i,0,#array then
-    //     print(array[i])
-    //   end
-    //
-    // ipairs will not work in this case
-    wrapper.Add(::vcl::util::Format("[%zu]",i),arg_buffer,true);
+      // We cannot use Lua's builtin array , but have to generate key value pair for Lua
+      // to force it use 0 start index otherwise all the semantic gonna break. This is
+      // OK unless we don't use too much loop code here. If we will need to generate code
+      // for looping, the best bet we can have is using something like this:
+      //
+      //   for i,0,#array then
+      //     print(array[i])
+      //   end
+      //
+      // ipairs will not work in this case
+      wrapper.Add(::vcl::util::Format("[%zu]",i),arg_buffer,(i < node.list.size()-1));
+    }
   }
+  output->push_back(')');
 
-  // Add a tag into the table to show this is a list
-  wrapper.Add(kVCLTypeName,"\"list\"",false);
   return true;
 }
 
 bool Transpiler::Transpile( const ast::Dict& node , int indent , std::string* output ) {
-  Collection wrapper(output,"{","}");
-  std::string arg_buffer;
-  for( size_t i = 0 ; i < node.list.size() ; ++i ) {
-    const ast::Dict::Entry& e = node.list[i];
-    // Generate key
-    output->push_back('[');
-    arg_buffer.clear();
-    if(!TranspileExpression(*e.key,indent,&arg_buffer)) return false;
-    output->append(arg_buffer);
-    output->push_back(']');
+  FormatAppend(output,"__vcl_builtin_NewDict(",m_opt.runtime_namespace.c_str());
+  {
+    Collection wrapper(output,"{","}");
+    std::string arg_buffer;
+    for( size_t i = 0 ; i < node.list.size() ; ++i ) {
+      const ast::Dict::Entry& e = node.list[i];
+      // Generate key
+      output->push_back('[');
+      arg_buffer.clear();
+      if(!TranspileExpression(*e.key,indent,&arg_buffer)) return false;
+      output->append(arg_buffer);
+      output->push_back(']');
 
-    // Generate assign
-    output->append(" = " );
+      // Generate assign
+      output->append(" = " );
 
-    // Generate value
-    arg_buffer.clear();
-    if(!TranspileExpression(*e.value,indent,&arg_buffer)) return false;
-    output->append(arg_buffer);
+      // Generate value
+      arg_buffer.clear();
+      if(!TranspileExpression(*e.value,indent,&arg_buffer)) return false;
+      output->append(arg_buffer);
 
-    if( i < node.list.size() - 1 ) output->push_back(',');
+      if( i < node.list.size() - 1 ) output->push_back(',');
+    }
   }
-
+  output->push_back(')');
   return true;
 }
 
@@ -645,13 +624,12 @@ bool Transpiler::Transpile( const ast::Size& node , int indent , std::string* ou
   VCL_UNUSED(indent);
 
   Template::Argument arg;
-  arg["ns"] = Template::Str( m_opt.runtime_namespace );
   arg["b"]  = Template::Str( ::vcl::util::Format("%d",node.value.bytes) );
   arg["kb"] = Template::Str( ::vcl::util::Format("%d",node.value.kilobytes) );
   arg["mb"] = Template::Str( ::vcl::util::Format("%d",node.value.megabytes) );
   arg["gb"] = Template::Str( ::vcl::util::Format("%d",node.value.gigabytes) );
 
-  CHECK( m_te.Render("%{ns}.new_size({b=${b},kb=${kb},mb=${mb},gb=${gb}})",arg,output) );
+  CHECK( m_te.Render("__vcl_builtin_NewSize({b=${b},kb=${kb},mb=${mb},gb=${gb}})",arg,output) );
   return true;
 }
 
@@ -665,7 +643,7 @@ bool Transpiler::Transpile( const ast::Duration& node , int indent , std::string
   arg["second"] = Template::Str( ::vcl::util::Format("%d",node.value.second) );
   arg["millisecond"] = Template::Str( ::vcl::util::Format("%d",node.value.millisecond) );
 
-  CHECK( m_te.Render("%{ns}.new_duration({"
+  CHECK( m_te.Render("__vcl_builtin_NewDuration({"
                        "millisecond=${millisecond}})"
                        "minute=${minute},"
                        "second=${second},"
@@ -725,13 +703,13 @@ bool Transpiler::Transpile( const ast::StringInterpolation& node, int indent , s
   //
   // In Lua the simplest way is to use a table and then call table.concat
 
-  output->append("__vcl_builtin_FunctionJoin(");
+  output->append("__vcl_builtin_Join(");
 
   for( size_t i = 0 ; i < node.list.size() ; ++i ) {
     const ast::AST& comp = *node.list.Index(i);
 
     if(comp.type != ast::AST_STRING) {
-      output->append("tostring(");
+      output->append("__vcl_builtin_ToString(");
       arg_buffer.clear();
       if(!TranspileExpression(comp,indent,&arg_buffer)) return false;
       output->append(arg_buffer);
@@ -806,13 +784,9 @@ bool Transpiler::Transpile( const ast::Binary& node , int indent , std::string* 
       return false;
 
     if(node.op == TK_MATCH) {
-      FormatAppend(output,"%s.match(%s,%s)",m_opt.runtime_namespace.c_str(),
-                                            lhs_buffer.c_str(),
-                                            rhs_buffer.c_str());
+      FormatAppend(output,"__vcl_builtin_Match(%s,%s)", lhs_buffer.c_str(), rhs_buffer.c_str());
     } else {
-      FormatAppend(output,"%s.not_match(%s,%s)",m_opt.runtime_namespace.c_str(),
-                                                lhs_buffer.c_str(),
-                                                rhs_buffer.c_str());
+      FormatAppend(output,"__vcl_builtin_NotMatch(%s,%s)", lhs_buffer.c_str(), rhs_buffer.c_str());
     }
   } else if(node.op == TK_ADD) {
     // To support polymorphic add , which Lua doesn't have , we need to emit all
@@ -823,9 +797,7 @@ bool Transpiler::Transpile( const ast::Binary& node , int indent , std::string* 
        !TranspileExpression(*node.rhs,indent,&rhs_buffer))
       return false;
 
-    FormatAppend(output,"%s(%s,%s)",kVCLBuiltinAdd,
-                                    lhs_buffer.c_str(),
-                                    rhs_buffer.c_str());
+    FormatAppend(output,"__vcl_builtin_Add(%s,%s)",lhs_buffer.c_str(),rhs_buffer.c_str());
   } else {
     output->push_back('(');
     if(!TranspileExpression(*node.lhs,indent,output)) return false;
@@ -887,12 +859,13 @@ bool Transpiler::Transpile( const ast::Prefix& node , size_t target , int indent
         temp.push_back(']');
         break;
       case ast::Prefix::Component::DOT:
-        if(!CheckLuaKeyword(node.location,n.var)) return false;
         if( i > 0 ) {
+          if(!CheckLuaKeyword(node.location,n.var)) return false;
           temp.append("[\"");
           temp.append(n.var->data());
           temp.append("\"]");
         } else {
+          if(!CheckIdentifierName(node.location,n.var)) return false;
           temp.append(n.var->data());
         }
         break;
@@ -902,9 +875,8 @@ bool Transpiler::Transpile( const ast::Prefix& node , size_t target , int indent
           std::string buffer;
           // Now we need to wrap the temporary buffer's stuff as a function call into a
           // {runtime}.get_attr(object,key) call since Lua doesn't support attribute syntax.
-          FormatAppend(&buffer,"%s.attr.get(%s,\"%s\")",m_opt.runtime_namespace.c_str(),
-                                                    temp.c_str(),
-                                                    n.var->data());
+          FormatAppend(&buffer,"__vcl_builtin_AttrGet(%s,\"%s\")",temp.c_str(),
+                                                                  n.var->data());
           temp.swap(buffer);
           break;
         }
@@ -1010,10 +982,9 @@ bool Transpiler::Transpile( const ast::Set& node , int indent , std::string* out
                                                 buffer.c_str());
         break;
       case TK_SELF_ADD:
-        WriteLine( output , indent , "%s = %s(%s,%s)",node.lhs.variable->data(),
-                                                      kVCLBuiltinAdd,
-                                                      node.lhs.variable->data(),
-                                                      buffer.c_str());
+        WriteLine( output , indent , "%s = __vcl_builtin_Add(%s,%s)",node.lhs.variable->data(),
+                                                                     node.lhs.variable->data(),
+                                                                     buffer.c_str());
         break;
       case TK_SELF_SUB:
         WriteLine( output , indent , "%s = %s - %s", node.lhs.variable->data(),
@@ -1053,38 +1024,32 @@ bool Transpiler::Transpile( const ast::Set& node , int indent , std::string* out
 
       switch(node.op) {
         case TK_ASSIGN:
-          WriteLine( output , indent , "%s.attr.set( %s , \"%s\" , %s )", m_opt.runtime_namespace.c_str(),
-                                                                          object.c_str(),
+          WriteLine( output , indent , "__vcl_builtin_AttrSet( %s , \"%s\" , %s )", object.c_str(),
                                                                           last_comp.var->data(),
                                                                           buffer.c_str() );
           break;
         case TK_SELF_ADD:
-          WriteLine( output , indent , "%s.attr.self_add( %s, \"%s\" , %s )", m_opt.runtime_namespace.c_str(),
-                                                                              object.c_str(),
+          WriteLine( output , indent , "__vcl_builtin_AttrSelfAdd( %s, \"%s\" , %s )", object.c_str(),
                                                                               last_comp.var->data(),
                                                                               buffer.c_str());
           break;
         case TK_SELF_SUB:
-          WriteLine( output , indent , "%s.attr.self_sub( %s, \"%s\", %s )", m_opt.runtime_namespace.c_str(),
-                                                                             object.c_str(),
+          WriteLine( output , indent , "__vcl_builtin_AttrSelfSub( %s, \"%s\", %s )", object.c_str(),
                                                                              last_comp.var->data(),
                                                                              buffer.c_str());
           break;
         case TK_SELF_MUL:
-          WriteLine( output , indent , "%s.attr.self_mul( %s, \"%s\", %s )", m_opt.runtime_namespace.c_str(),
-                                                                             object.c_str(),
+          WriteLine( output , indent , "__vcl_builtin_AttrSelfMul( %s, \"%s\", %s )", object.c_str(),
                                                                              last_comp.var->data(),
                                                                              buffer.c_str());
           break;
         case TK_SELF_DIV:
-          WriteLine( output , indent , "%s.attr.self_div( %s, \"%s\", %s )", m_opt.runtime_namespace.c_str(),
-                                                                             object.c_str(),
+          WriteLine( output , indent , "__vcl_builtin_AttrSelfDiv( %s, \"%s\", %s )", object.c_str(),
                                                                              last_comp.var->data(),
                                                                              buffer.c_str());
           break;
         case TK_SELF_MOD:
-          WriteLine( output , indent , "%s.attr.self_mod( %s, \"%s\", %s )", m_opt.runtime_namespace.c_str(),
-                                                                             object.c_str(),
+          WriteLine( output , indent , "__vcl_builtin_AttrSelfMod( %s, \"%s\", %s )", object.c_str(),
                                                                              last_comp.var->data(),
                                                                              buffer.c_str());
           break;
@@ -1188,24 +1153,18 @@ bool Transpiler::Transpile( const ast::Unset& node , int indent , std::string* o
 
     switch(last_comp.tag) {
       case ast::Prefix::Component::ATTRIBUTE:
-        WriteLine(output,indent,"%s.attr.unset(%s,%s)",m_opt.runtime_namespace.c_str(),
-                                                       buffer.c_str(),
-                                                       last_comp.var->data());
+        WriteLine(output,indent,"__vcl_builtin_AttrUnset(%s,%s)", buffer.c_str(),last_comp.var->data());
         break;
       case ast::Prefix::Component::INDEX:
         {
           std::string expr;
           if(!TranspileExpression(*last_comp.expression,indent,&expr))
             return false;
-          WriteLine(output,indent,"%s.unset_prop(%s,%s)",m_opt.runtime_namespace.c_str(),
-                                                         buffer.c_str(),
-                                                         expr.c_str());
+          WriteLine(output,indent,"__vcl_builtin_UnsetProp(%s,%s)", buffer.c_str(),expr.c_str());
         }
         break;
       case ast::Prefix::Component::DOT:
-        WriteLine(output,indent,"%s.unset_prop(%s,%s)",m_opt.runtime_namespace.c_str(),
-                                                       buffer.c_str(),
-                                                       last_comp.var->data());
+        WriteLine(output,indent,"__vcl_builtin_UnsetProp(%s,%s)",buffer.c_str(),last_comp.var->data());
         break;
       default:
         VCL_UNREACHABLE();
@@ -1282,7 +1241,7 @@ bool Transpiler::Transpile( const ast::Terminate& node, int indent , std::string
       break;
   }
 
-  WriteLine(indent,"coroutine.yield()");
+  WriteLine(indent,"__vcl_builtin_CoroutineYield()");
   return true;
 }
 
@@ -1346,8 +1305,8 @@ bool Transpiler::Transpile( const ast::Import& node , int indent ) {
                                          m_opt.inline_module_name.c_str(),
                                          node.module_name->data());
   } else {
-    WriteLine(indent,"local %s = require(\"%s\")",node.module_name->data(),
-                                                  node.module_name->data());
+    WriteLine(indent,"local %s = __vcl_builtin_Require(\"%s\")",node.module_name->data(),
+                                                                node.module_name->data());
   }
   return true;
 }
@@ -1372,12 +1331,11 @@ bool Transpiler::Transpile( const ast::Extension& node, int indent ) {
   comment.Line(CurrentSourceFile(),"extension",node.location);
 
   Template::Argument arg;
-  arg["ns"] = Template::Str(m_opt.runtime_namespace);
   arg["name"] = Template::Str(node.type_name->data());
   arg["arg"] = Template::Value(NewExtensionInitializerGenerator(
         *node.initializer,indent));
   arg["obj"] = Template::Str(node.instance_name->data());
-  WriteTemplateLine(indent,"${obj} = ${ns}.extension.${name}(${arg})",arg);
+  WriteTemplateLine(indent,"${obj} = __vcl_builtin_Extension.${name}(${arg})",arg);
   return true;
 }
 
@@ -1610,28 +1568,6 @@ bool Options::Create( const ::vcl::experiment::TranspilerOptionTable& tt ,
   if(opt->allow_module_inline) DO("inline_module_name",inline_module_name);
   DO("runtime_namespace",runtime_namespace);
   DO("runtime_path",runtime_path);
-
-  /* disable most of lua builtin functions for security reason */
-  DO("disable_collectgarbage",disable_collectgarbage);
-  DO("disable_dofile",disable_dofile);
-  DO("disable_getfenv",disable_getfenv);
-  DO("disable_getmetatable",disable_getmetatable);
-  DO("disable_ipairs",disable_ipairs);
-  DO("disable_load",disable_load);
-  DO("disable_loadfile",disable_loadfile);
-  DO("disable_loadstring",disable_loadstring);
-  DO("disable_module",disable_module);
-  DO("disable_next",disable_next);
-  DO("disable_pairs",disable_pairs);
-  DO("disable_pcall",disable_pcall);
-  DO("disable_rawequal",disable_rawequal);
-  DO("disable_rawget",disable_rawget);
-  DO("disable_require",disable_require);
-  DO("disable_select",disable_select);
-  DO("disable_setfenv",disable_setfenv);
-  DO("disable_setmetatable",disable_setmetatable);
-  DO("disable_unpack",disable_unpack);
-  DO("disable_xpcall",disable_xpcall);
 
 #undef DO // DO
 
