@@ -150,10 +150,56 @@ sub test_logic {
   }
 }
 
+sub test_ternary {
+  {
+    new a = if(true,1,0);
+    assert( a == 1 );
+  }
+  {
+    new a = 10;
+    assert( if( 10 < a , -1 , if( 10 == a , 0 , -1 ) ) == 0 );
+  }
+}
+
+sub test_dict {
+  {
+    new a = {};
+    assert( type(a) == "dict" );
+  }
+  {
+    new a = {
+      b : 1,
+      cccc : 2,
+      x_f : 3,
+      "x-f" : 4
+    };
+
+    assert( a.b == 1 );
+    assert( a."cccc" == 2 );
+    assert( a."x_f" == 3 );
+    assert( a.x-f == 4 );
+  }
+}
+
+sub test_array {
+  {
+    new a = [1,2,3,4,5,6];
+    assert( a[0] == 1 );
+    assert( a[1] == 2 );
+    assert( a[2] == 3 );
+    assert( a[3] == 4 );
+    assert( a[4] == 5 );
+    assert( a[5] == 6 );
+  }
+
+}
 
 sub test {
   test_unary;
   test_primary;
   test_binary;
   test_logic;
+  test_ternary;
+  test_dict;
+  test_array;
 }

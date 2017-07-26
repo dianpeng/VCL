@@ -67,6 +67,32 @@ struct Options {
   // local ${runtime_namespace} = require(${runtime_path})
   std::string runtime_path;
 
+  // Lua builtin function disable ------------------------------------
+  //
+  // These functions doesn't make too much sense to VCL frontend, by default
+  // they are *all* disabled from user's script and they are not able to call
+  // them at all.
+  bool disable_collectgarbage;
+  bool disable_dofile;
+  bool disable_getfenv;
+  bool disable_getmetatable;
+  bool disable_ipairs;
+  bool disable_load;
+  bool disable_loadfile;
+  bool disable_loadstring;
+  bool disable_module;
+  bool disable_next;
+  bool disable_pairs;
+  bool disable_pcall;
+  bool disable_rawequal;
+  bool disable_rawget;
+  bool disable_require;
+  bool disable_select;
+  bool disable_setfenv;
+  bool disable_setmetatable;
+  bool disable_unpack;
+  bool disable_xpcall;
+
   // Creation function for creating a Options object from the TranspilerOptionTable
   static bool Create( const ::vcl::experiment::TranspilerOptionTable& , Options* ,
                                                                         std::string* );
@@ -90,8 +116,28 @@ struct Options {
     empty_code               (-1),
     allow_module_inline      (false),
     inline_module_name       (),
-    runtime_namespace        ("vcl"),
-    runtime_path             ("")
+    runtime_namespace        ("__vcl"),
+    runtime_path             (""),
+    disable_collectgarbage   (true),
+    disable_dofile           (true),
+    disable_getfenv          (true),
+    disable_getmetatable     (true),
+    disable_ipairs           (true),
+    disable_load             (true),
+    disable_loadfile         (true),
+    disable_loadstring       (true),
+    disable_module           (true),
+    disable_next             (true),
+    disable_pairs            (true),
+    disable_pcall            (true),
+    disable_rawequal         (true),
+    disable_rawget           (true),
+    disable_require          (true),
+    disable_select           (true),
+    disable_setfenv          (true),
+    disable_setmetatable     (true),
+    disable_unpack           (true),
+    disable_xpcall           (true)
   {}
 };
 

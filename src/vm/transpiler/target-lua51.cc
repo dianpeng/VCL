@@ -31,7 +31,7 @@ static const size_t kIndentSize = 2;
 
 
 // Builtin variables or other stuff name
-static const char* kVCLVariablePrefix = "__vcl_builtin_";
+static const char* kVCLVariablePrefix = "__vcl";
 
 static const char* kVCLTypeName = "__vcl_builtin_Type";
 // static const char* kVCLMain = "__vcl_builtin_Main";
@@ -70,7 +70,7 @@ static const char* kBuiltinFunctions =
   "end\n"
   /* __vcl_builtin_FunctionKeyExist */
   "function __vcl_builtin_FunctionKeyExist(a,key)\n"
-  "  for k, _ in pairs(a) do\n"
+  "  for k, _ in __vcl_builtin_FunctionLuapairs(a) do\n"
   "     if (k == key) then\n"
   "       return true\n"
   "     end\n"
@@ -79,7 +79,7 @@ static const char* kBuiltinFunctions =
   "end\n"
   /* __vcl_builtin_FunctionPrintln */
   "function __vcl_builtin_FunctionPrintln(...)\n"
-  "  print(unpack(arg))\n"
+  "  print(__vcl_builtin_FunctionLuaunpack(arg))\n"
   "end\n"
   "println = __vcl_builtin_FunctionPrintln\n"
   "local __vcl_builtin_TableConcat = table.concat\n"
@@ -288,6 +288,9 @@ class Transpiler {
     return true;
   }
 
+  // Dislabe certain lua function while running the scripts
+  void DisableLuaFunction( const char* );
+
  private:
   // Initialization
   void SetupHeader();
@@ -413,6 +416,13 @@ fail:
   return false;
 }
 
+void Transpiler::DisableLuaFunction( const char* function_name ) {
+  Comment comment(m_output,0);
+  comment.Line("Disable Lua's builtin function or global function %s",function_name);
+  WriteLine(0,"local __vcl_builtin_FunctionLua%s = %s",function_name,function_name);
+  WriteLine(0,"%s = nil",function_name);
+}
+
 bool Transpiler::GenerateFunctionPrototype( const std::string& key ,
                                             std::string* output ,
                                             const ast::Sub& node ,
@@ -503,14 +513,40 @@ void Transpiler::SetupHeader() {
   comment.Line("builtin VCL variable for terminating return");
   WriteLine(0,"%s = %d",kVCLTerminateCode,m_opt.empty_code);
 
+#define DO(NAME) if(m_opt.disable_##NAME) DisableLuaFunction( #NAME )
+
+  DO(collectgarbage);
+  DO(dofile);
+  DO(getfenv);
+  DO(getmetatable);
+  DO(ipairs);
+  DO(load);
+  DO(loadfile);
+  DO(loadstring);
+  DO(module);
+  DO(next);
+  DO(pairs);
+  DO(pcall);
+  DO(rawequal);
+  DO(rawget);
+  DO(require);
+  DO(select);
+  DO(setfenv);
+  DO(setmetatable);
+  DO(unpack);
+  DO(xpcall);
+
+#undef DO // DO
+
   comment.Line("*************************** Builtin Functions Start *****************************");
   m_output->append( kBuiltinFunctions );
   comment.Line("*************************** Builtin Functions End  ******************************");
 
   if( !m_opt.runtime_path.empty() ) {
-    WriteLine(0,"local %s = require(\"%s\")",m_opt.runtime_namespace.c_str(),
-                                             EscapeLuaString(m_opt.runtime_path.c_str()).c_str());
+    WriteLine(0,"local %s = __vcl_builtin_FunctionLuarequire(\"%s\")",m_opt.runtime_namespace.c_str(),
+                                                                      EscapeLuaString(m_opt.runtime_path.c_str()).c_str());
   }
+
 
 }
 
@@ -1574,6 +1610,28 @@ bool Options::Create( const ::vcl::experiment::TranspilerOptionTable& tt ,
   if(opt->allow_module_inline) DO("inline_module_name",inline_module_name);
   DO("runtime_namespace",runtime_namespace);
   DO("runtime_path",runtime_path);
+
+  /* disable most of lua builtin functions for security reason */
+  DO("disable_collectgarbage",disable_collectgarbage);
+  DO("disable_dofile",disable_dofile);
+  DO("disable_getfenv",disable_getfenv);
+  DO("disable_getmetatable",disable_getmetatable);
+  DO("disable_ipairs",disable_ipairs);
+  DO("disable_load",disable_load);
+  DO("disable_loadfile",disable_loadfile);
+  DO("disable_loadstring",disable_loadstring);
+  DO("disable_module",disable_module);
+  DO("disable_next",disable_next);
+  DO("disable_pairs",disable_pairs);
+  DO("disable_pcall",disable_pcall);
+  DO("disable_rawequal",disable_rawequal);
+  DO("disable_rawget",disable_rawget);
+  DO("disable_require",disable_require);
+  DO("disable_select",disable_select);
+  DO("disable_setfenv",disable_setfenv);
+  DO("disable_setmetatable",disable_setmetatable);
+  DO("disable_unpack",disable_unpack);
+  DO("disable_xpcall",disable_xpcall);
 
 #undef DO // DO
 

@@ -678,20 +678,18 @@ ast::AST* ConstantFolder::Fold(ast::Ternary* node, FoldResult* result) {
 
   bool condition = ToBoolean(*result);
   if (condition) {
-    FoldResult first_result;
-    ast::AST* first = Fold(node->first, &first_result);
-    if (first_result.kind == EKIND_ERROR)
+    ast::AST* first = Fold(node->first, result);
+    if (result->kind == EKIND_ERROR)
       return NULL;
-    else if (first_result.kind == EKIND_COMPLEX)
+    else if (result->kind == EKIND_COMPLEX)
       return first;
     else
       return NULL;
   } else {
-    FoldResult second_result;
-    ast::AST* second = Fold(node->second, &second_result);
-    if (second_result.kind == EKIND_ERROR)
+    ast::AST* second = Fold(node->second, result);
+    if (result->kind == EKIND_ERROR)
       return NULL;
-    else if (second_result.kind == EKIND_COMPLEX)
+    else if (result->kind == EKIND_COMPLEX)
       return second;
     else
       return NULL;

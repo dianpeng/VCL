@@ -31,9 +31,9 @@ int main( int argc , char* argv[] ) {
     ("allow-module-inline",po::bool_switch()->default_value(false),"allow module to be inlined instead of require" \
                                                                    ",once defined must define inline_module_name!")
     ("inline-module-name",po::value<std::string>()->default_value(""),"inline_module_name specify name for inline module")
-    ("runtime-namespace",po::value<std::string>()->default_value("vcl"),"speicify customized the namespace for "
-                                                                                "all needed runtime function,default to"
-                                                                                " vcl")
+    ("runtime-namespace",po::value<std::string>()->default_value("__vcl"),"speicify customized the namespace for "
+                                                                                "all needed runtime function,default to "
+                                                                                "__vcl")
     ("runtime-path",po::value<std::string>()->default_value(""),"specify a path which will be loaded as internal runtime object");
 
 
