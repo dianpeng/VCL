@@ -477,9 +477,13 @@ void Transpiler::SetupHeader() {
     WriteLine(0,"_VERSION = \"vcl 4.0\"");
   }
 
-  if( !m_opt.runtime_path.empty() ) {
-    WriteLine(0,"local %s = require(\"%s\")",m_opt.runtime_namespace.c_str(),
-                                             EscapeLuaString(m_opt.runtime_path.c_str()).c_str());
+  if( !m_opt.runtime_module.empty() ) {
+    comment.Line("Runtime module initialization code provided by the user");
+    WriteLine(0,"%s",m_opt.runtime_module.c_str());
+  }
+  if( !m_opt.header_code.empty() ) {
+    comment.Line("Header code initialization code provided by the user");
+    WriteLine(0,"%s",m_opt.header_code.c_str());
   }
 
   comment.Line("*************************** Runtime Function Alias ******************************");
@@ -491,11 +495,9 @@ void Transpiler::SetupHeader() {
   WriteLine(0,"local __vcl_builtin_CoroutineYield = coroutine.yield");
   WriteLine(0,"local __vcl_builtin_Rawset = rawset");
   WriteLine(0,"local __vcl_builtin_Require= require");
-  WriteLine(0,"local type = %s.type",m_opt.runtime_namespace.c_str());
-  WriteLine(0,"local println = print");
-  WriteLine(0,"local size = %s.size",m_opt.runtime_namespace.c_str());
   WriteLine(0,"local __vcl_builtin_Join = %s.join",m_opt.runtime_namespace.c_str());
   WriteLine(0,"local __vcl_builtin_Add = %s.op_add",m_opt.runtime_namespace.c_str());
+  WriteLine(0,"local __vcl_builtin_Not = %s.op_not",m_opt.runtime_namespace.c_str());
   WriteLine(0,"local __vcl_builtin_Match = %s.match",m_opt.runtime_namespace.c_str());
   WriteLine(0,"local __vcl_builtin_NotMatch = %s.not_match",m_opt.runtime_namespace.c_str());
   WriteLine(0,"local __vcl_builtin_NewList = %s.new_list",m_opt.runtime_namespace.c_str());
@@ -514,11 +516,6 @@ void Transpiler::SetupHeader() {
   WriteLine(0,"local __vcl_builtin_UnsetProp = %s.unset_prop",m_opt.runtime_namespace.c_str());
   WriteLine(0,"local __vcl_builtin_ToString = %s.to_string",m_opt.runtime_namespace.c_str());
   comment.Line("*********************** Runtime Function Alias End ******************************");
-
-  comment.Line("********************* Mask Lua's Global Function ********************************");
-  WriteLine(0,"rawset = nil");
-  WriteLine(0,"require= nil");
-  comment.Line("********************* Mask Lua's Global Function End ****************************");
 
   comment.Line("*********************************************************************************");
   comment.Line("*************************** Generated Code Start ********************************");
@@ -745,34 +742,64 @@ bool Transpiler::Transpile( const ast::StringConcat& node , int indent , std::st
 
 bool Transpiler::Transpile( const ast::Unary& node , int indent , std::string* output ) {
   size_t sub_count = 0;
+  std::string fragment;
 
-  for( size_t i = 0 ; i < node.ops.size() ; ++i ) {
-    switch(node.ops.Index(i)) {
-      case TK_ADD:
-        break;
-      case TK_SUB:
-        output->push_back('-');
-        ++sub_count;
-        if(sub_count == 2) {
-          ReportError(node.location,
-                      "Cannot put 2 consecutive \"-\" to serve as unary operator,"
-                      "this is allowed in VCL virtual machine but Lua will treat it "
-                      "as comment!");
+  // NOTES:
+  //
+  // Lua's not operator works *unexpectedly* on numbers :
+  //  assert( not 1.000 == false )
+  //  assert( not 0.000 == false )
+  //  assert( not 1 == false )
+  //  assert( not 0 == false )
+  //
+  // This drastically doesn't match typical semantic in most langauge, including VCL, so
+  // we need to work around it by *not* using "not" operator in Lua instead call a function
+  // to simulate it. Same as all the *+" operator.
+
+  if(!TranspileExpression(*node.operand,indent,&fragment))
+    return false;
+
+
+  {
+    std::string temp;
+    for( size_t i = 0 ; i < node.ops.size() ; ++i ) {
+      switch(node.ops.Index(i)) {
+        case TK_ADD:
+          break;
+        case TK_SUB:
+          temp.push_back('-');
+          ++sub_count;
+          if(sub_count == 2) {
+            ReportError(node.location,
+                "Cannot put 2 consecutive \"-\" to serve as unary operator,"
+                "this is allowed in VCL virtual machine but Lua will treat it "
+                "as comment!");
+            return false;
+          }
+          break;
+
+        case TK_NOT:
+          {
+            std::string t;
+            t.append("__vcl_builtin_Not(");
+            t.append(temp);
+            t.append(fragment);
+            t.push_back(')');
+            fragment.swap(t);
+            sub_count = 0;
+            temp.clear();
+          }
+          break;
+        default:
+          VCL_UNREACHABLE();
           return false;
-        }
-        break;
-
-      case TK_NOT:
-        output->append("not ");
-        sub_count = 0;
-        break;
-      default:
-        VCL_UNREACHABLE();
-        return false;
+      }
     }
+
+    output->append(temp);
+    output->append(fragment);
   }
 
-  if(!TranspileExpression(*node.operand,indent,output)) return false;
   return true;
 }
 
@@ -1181,7 +1208,7 @@ bool Transpiler::Transpile( const ast::Return& node , int indent , std::string* 
   output->append( GetIndent(indent) );
   output->append( "return ");
   if(!node.value) {
-    output->append("nil");
+    output->append("nil\n");
     return true;
   } else {
     if(!TranspileExpression(*node.value,indent,output)) return false;
@@ -1567,7 +1594,8 @@ bool Options::Create( const ::vcl::experiment::TranspilerOptionTable& tt ,
   DO("allow_module_inline",allow_module_inline);
   if(opt->allow_module_inline) DO("inline_module_name",inline_module_name);
   DO("runtime_namespace",runtime_namespace);
-  DO("runtime_path",runtime_path);
+  DO("runtime_module",runtime_module);
+  DO("header_code",header_code);
 
 #undef DO // DO
 

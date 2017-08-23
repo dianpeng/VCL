@@ -18,8 +18,11 @@ end
 local _type = type
 local _rawset = rawset
 local _tostring = tostring
+local _pairs = pairs
+local _tonumber = tonumber
+local _print = print
 
-return {
+local _export = {
   attr = {
     -- Get attribute named of "b" from object "a"
     get = function(a,b)
@@ -175,7 +178,7 @@ return {
     return init
   end,
 
-  -- Type global functions
+  -- Type global function
   type = function(a)
     local t = _type(a)
     if (t == "table") then
@@ -188,11 +191,42 @@ return {
     return t
   end,
 
+  -- Size global function
+  size = function(a)
+    local t = _type(a)
+    if t.__vcl_builtin_Type ~= nil then
+      if t.__vcl_builtin_Type == "dict" then
+        local sum = 0
+        for _ in _pairs(t) do
+          sum = sum + 1
+        end
+        return (sum - 1) -- Exclude __vcl_builtin_Type
+      elseif t.__vcl_builtin_Type == "list" then
+        return (#t + 1)  -- Starting from 0
+      else
+        return 1
+      end
+    end
+    return #a
+  end,
+
   -- Add operator , all add operation will be redirected to this function
   op_add = function(a,b)
     local ta = _type(a)
     local tb = _type(b)
     return (( ta == "string" and tb == "string" ) and (a..b) or (a+b))
+  end,
+
+  op_not = function(a)
+    local ta = _type(a)
+    if ta == "number" then
+      if a == 0 then
+        return true
+      else
+        return false
+      end
+    end
+    return (not a)
   end,
 
   -- Misc runtime functions
@@ -201,9 +235,20 @@ return {
     return _tostring(a)
   end,
 
+  to_number = function(a)
+    return _tonumber(a)
+  end,
+
+  print = _print,
+  assert = assert,
+  error  = error,
   join = _join,
 
   -- Extension exposed. If we allow any extension, then we need to wrap it in the following
   -- table/namespace. Read the section of extension for more information
   extension = {}
 }
+
+-- mask global type value
+type = _export.type
+return _export

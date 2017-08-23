@@ -34,7 +34,8 @@ int main( int argc , char* argv[] ) {
     ("runtime-namespace",po::value<std::string>()->default_value("__vcl"),"speicify customized the namespace for "
                                                                                 "all needed runtime function,default to "
                                                                                 "__vcl")
-    ("runtime-path",po::value<std::string>()->default_value(""),"specify a path which will be loaded as internal runtime object");
+    ("runtime-module",po::value<std::string>()->default_value(""),"specify lua code to load runtime")
+    ("header-code",po::value<std::string>()->default_value(""),"specify lua code to put at the header of file");
 
 
   po::variables_map vmap;
@@ -69,7 +70,8 @@ int main( int argc , char* argv[] ) {
   DO("allow_module_inline","allow-module-inline",bool);
   DO("inline_module_name","inline-module-name",std::string);
   DO("runtime_namespace","runtime-namespace",std::string);
-  DO("runtime_path","runtime-path",std::string);
+  DO("runtime_module","runtime-module",std::string);
+  DO("header_code","header-code",std::string);
 
 #undef DO // DO
 
